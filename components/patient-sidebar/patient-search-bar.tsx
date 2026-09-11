@@ -49,9 +49,9 @@ export function PatientSearchBar({ query, onChange }: PatientSearchBarProps) {
         }}
         placeholder="Search patient, EHR, bed..."
         aria-label="Search patients by name, EHR, or bed number"
-        className="h-9 w-full rounded-xl border-white/80 bg-white/70 pl-8 pr-14 text-xs placeholder:text-slate-400 focus-visible:bg-white focus-visible:ring-1 focus-visible:ring-violet-400"
+        className="h-10 w-full rounded-xl border-white/80 bg-white/70 pl-8 pr-14 text-xs placeholder:text-slate-400 focus-visible:bg-white focus-visible:ring-1 focus-visible:ring-violet-400"
       />
-      <div className="absolute right-2 flex items-center gap-1">
+      <div className="absolute right-1 flex items-center">
         {query ? (
           <button
             type="button"
@@ -60,12 +60,14 @@ export function PatientSearchBar({ query, onChange }: PatientSearchBarProps) {
               inputRef.current?.focus();
             }}
             aria-label="Clear search"
-            className="rounded p-0.5 text-slate-400 hover:text-slate-600 focus-visible:outline-none"
+            className="flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg text-slate-400 transition-[color,transform] duration-150 hover:text-slate-600 focus-visible:outline-none active:scale-[0.96]"
           >
-            <X className="size-3" />
+            <X className="size-3.5" />
           </button>
         ) : (
-          <Kbd className="hidden text-[9px] sm:inline-block">/</Kbd>
+          <span className="pr-2.5">
+            <Kbd className="hidden text-[9px] sm:inline-block">/</Kbd>
+          </span>
         )}
       </div>
     </div>

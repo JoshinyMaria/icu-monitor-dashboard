@@ -44,7 +44,7 @@ The web interface is built as a production-grade, static-exportable SaaS dashboa
 
 1. **Security & Secrets Isolation**: Direct browser fetching from Kaggle cannot be performed because it requires API credentials that must never be exposed to client bundles, and is blocked by CORS.
 2. **Two-Table Ingestion & Normalization**: The Kaggle dataset archive provides dual tables: `patient_vitals.csv` (383k+ 15-minute time-series clinical readings) and `patients_meta.csv` (patient demographics, ICU unit assignments, and admission context across 500 patients). The ETL script robustly identifies both tables, joins demographic and ward metadata by patient ID, normalizes clinical telemetry into the structured `PatientRecord` TypeScript interface, calculates sensor-fusion indicators, and computes deterioration alert factors.
-3. **Deterministic Static Cohort**: Generates a lightweight, balanced 24-patient cohort at `public/data/demo-cohort.json` (7 Critical, 8 Moderate, 9 Stable) enabling zero-latency exploration and static deployment without server dependencies.
+3. **Deterministic Static Cohort**: Generates a comprehensive 500-patient cohort at `public/data/demo-cohort.json` (379 Critical, 66 Moderate, 55 Stable) directly from the real dual-table Kaggle dataset, enabling zero-latency exploration and static deployment on Cloudflare Pages without runtime server dependencies. The dashboard sidebar uses lightweight client-side virtualization to scroll all 500 patients with 60fps performance.
 
 ### Accepted Credentials
 
@@ -65,11 +65,19 @@ pip install -r scripts/requirements.txt
 
 #### 2. Run Sync Pipeline
 
-- **With Kaggle Credentials** (downloads and processes latest dataset):
+- **With Kaggle Credentials** (default 500-patient cohort from actual Kaggle tables):
   ```bash
   export KAGGLE_USERNAME="your_kaggle_username"
   export KAGGLE_KEY="your_kaggle_api_key"
   python scripts/sync_kaggle_cohort.py
+  ```
+
+- **Optional Smaller Cohort for Local Development** (`--cohort-size` or `--limit`):
+  ```bash
+  # Generate a smaller balanced cohort (e.g. 24 patients: 7 critical, 8 moderate, 9 stable)
+  python scripts/sync_kaggle_cohort.py --cohort-size 24
+  # Or use the --limit flag:
+  python scripts/sync_kaggle_cohort.py --limit 24
   ```
 
 - **With Local Dataset Directory or Files** (offline / existing download):

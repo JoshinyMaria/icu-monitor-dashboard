@@ -28,6 +28,7 @@ export interface PatientRecord {
   bed: string; // e.g. "Bed 04"
   admitted: string; // e.g. "2026-09-08 14:30"
   fileName?: string;
+  kaggleId?: string; // e.g. "P0001" (original Kaggle dataset ID)
   baselineVitals: Vitals;
   currentVitals: Vitals;
   derived: DerivedMetrics;

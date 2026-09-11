@@ -56,7 +56,7 @@ export function PatientFilterBar({
             aria-selected={isSelected}
             onClick={() => onFilterChange(tab.id)}
             className={cn(
-              'flex items-center justify-center gap-1 rounded-lg py-1 text-[11px] font-medium transition-all',
+              'flex min-h-[40px] items-center justify-center gap-1 rounded-lg px-1.5 py-2 text-[11px] font-medium transition-[background-color,color,box-shadow,transform] duration-150 active:scale-[0.96]',
               'text-slate-500 hover:text-slate-800',
               isSelected &&
                 'bg-white text-slate-900 shadow-sm font-semibold',
@@ -65,7 +65,7 @@ export function PatientFilterBar({
             <span>{tab.label}</span>
             <span
               className={cn(
-                'rounded-full px-1 text-[9px] font-mono leading-tight',
+                'rounded-full px-1 text-[9px] font-mono tabular-nums leading-tight',
                 tab.badgeColor ? tab.badgeColor : 'bg-slate-100 text-slate-500',
               )}
             >

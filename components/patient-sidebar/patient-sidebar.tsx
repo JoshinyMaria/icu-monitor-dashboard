@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -34,6 +34,10 @@ interface PatientSidebarProps {
   className?: string;
 }
 
+const OVERSCAN = 6;
+const CARD_ROW_HEIGHT = 94; // 86px card + 8px pb-2
+const COLLAPSED_ROW_HEIGHT = 52; // 44px avatar + 8px pb-2
+
 export function PatientSidebar({
   cohort,
   selectedPatient,
@@ -50,6 +54,32 @@ export function PatientSidebar({
   const [searchQuery, setSearchQuery] = useState('');
   const [riskFilter, setRiskFilter] = useState<RiskLevel>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [containerHeight, setContainerHeight] = useState(600);
+
+  const rowHeight = isCollapsed ? COLLAPSED_ROW_HEIGHT : CARD_ROW_HEIGHT;
+
+  // Track container height for virtualization
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+
+    const updateHeight = () => {
+      if (el.clientHeight > 0) {
+        setContainerHeight(el.clientHeight);
+      }
+    };
+    updateHeight();
+
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    setScrollTop(e.currentTarget.scrollTop);
+  };
 
   // Compute counts for filter pills
   const counts = useMemo(() => {
@@ -79,7 +109,8 @@ export function PatientSidebar({
         p.name.toLowerCase().includes(query) ||
         p.id.toLowerCase().includes(query) ||
         p.bed.toLowerCase().includes(query) ||
-        p.unit.toLowerCase().includes(query)
+        p.unit.toLowerCase().includes(query) ||
+        (Boolean(p.kaggleId) && p.kaggleId!.toLowerCase().includes(query))
       );
     });
   }, [cohort, searchQuery, riskFilter]);
@@ -90,6 +121,38 @@ export function PatientSidebar({
     const idx = filteredPatients.findIndex((p) => p.id === selectedPatient.id);
     return idx >= 0 ? idx : 0;
   }, [filteredPatients, selectedPatient]);
+
+  // Reset scroll when filter shrinks the list beyond current position
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const maxScroll = Math.max(0, filteredPatients.length * rowHeight - el.clientHeight);
+    if (el.scrollTop > maxScroll) {
+      el.scrollTop = 0;
+      setScrollTop(0);
+    }
+  }, [filteredPatients.length, rowHeight]);
+
+  // Auto-scroll selected patient into view when selection changes
+  useEffect(() => {
+    if (!selectedPatient) return;
+    const idx = filteredPatients.findIndex((p) => p.id === selectedPatient.id);
+    if (idx === -1) return;
+
+    const el = scrollContainerRef.current;
+    if (!el) return;
+
+    const itemTop = idx * rowHeight;
+    const itemBottom = itemTop + rowHeight;
+    const visibleTop = el.scrollTop;
+    const visibleBottom = el.scrollTop + el.clientHeight;
+
+    if (itemTop < visibleTop) {
+      el.scrollTo({ top: itemTop, behavior: 'smooth' });
+    } else if (itemBottom > visibleBottom) {
+      el.scrollTo({ top: itemBottom - el.clientHeight, behavior: 'smooth' });
+    }
+  }, [selectedPatient, filteredPatients, rowHeight]);
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -133,11 +196,25 @@ export function PatientSidebar({
 
   const hasCriticalPatients = counts.critical > 0;
 
+  // Windowing calculations
+  const totalCount = filteredPatients.length;
+  const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - OVERSCAN);
+  const endIndex = Math.min(
+    totalCount,
+    Math.ceil((scrollTop + containerHeight) / rowHeight) + OVERSCAN,
+  );
+  const topSpacerHeight = startIndex * rowHeight;
+  const bottomSpacerHeight = Math.max(0, (totalCount - endIndex) * rowHeight);
+
+  const visibleSlice = useMemo(() => {
+    return filteredPatients.slice(startIndex, endIndex);
+  }, [filteredPatients, startIndex, endIndex]);
+
   return (
     <aside
       aria-label="Patient Roster"
       className={cn(
-        'relative flex h-full flex-col border-r border-white/70 bg-[#f8faff]/85 backdrop-blur-2xl transition-all duration-300',
+        'relative flex h-full flex-col border-r border-white/70 bg-[#f8faff]/85 backdrop-blur-2xl transition-[width] duration-300',
         isCollapsed ? 'w-[72px]' : 'w-[310px] xl:w-[330px]',
         className,
       )}
@@ -180,7 +257,14 @@ export function PatientSidebar({
                   </Badge>
                 </div>
                 <div className="truncate text-[10px] text-slate-400">
-                  {cohort.length} Patients · {counts.critical} Critical
+                  <span className="font-semibold tabular-nums text-slate-600">
+                    {cohort.length}
+                  </span>{' '}
+                  Patients ·{' '}
+                  <span className="font-semibold tabular-nums text-rose-600">
+                    {counts.critical}
+                  </span>{' '}
+                  Critical
                 </div>
               </div>
             )}
@@ -192,7 +276,7 @@ export function PatientSidebar({
               size="icon"
               onClick={onToggleCollapse}
               aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              className="size-8 shrink-0 rounded-lg text-slate-400 hover:bg-white/80 hover:text-slate-600"
+              className="size-10 min-h-[40px] min-w-[40px] shrink-0 rounded-xl text-slate-400 transition-[color,background-color,transform] duration-150 hover:bg-white/80 hover:text-slate-600 active:scale-[0.96]"
             >
               {isCollapsed ? (
                 <PanelLeftOpen className="size-4" />
@@ -219,8 +303,35 @@ export function PatientSidebar({
         )}
       </div>
 
-      {/* Content: Scrollable Patient Roster */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 scrollbar-thin">
+      {/* Visible count indicator bar when not collapsed */}
+      {!isCollapsed && (
+        <div className="flex items-center justify-between border-b border-white/40 px-4 py-1.5 text-[11px] text-slate-400">
+          <span>
+            Showing{' '}
+            <span className="font-semibold tabular-nums text-slate-700">
+              {filteredPatients.length}
+            </span>{' '}
+            of <span className="tabular-nums">{cohort.length}</span>
+          </span>
+          {filteredPatients.length < cohort.length && (
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="flex min-h-[40px] items-center text-[10px] font-medium text-violet-600 transition-[color,transform] duration-150 hover:underline active:scale-[0.96]"
+            >
+              Reset filters
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Content: Virtualized Scrollable Patient Roster */}
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto px-3 py-3 scrollbar-thin"
+        aria-label="Patients list"
+      >
         {isLoading ? (
           <PatientListSkeleton count={6} />
         ) : filteredPatients.length === 0 ? (
@@ -233,30 +344,33 @@ export function PatientSidebar({
         ) : (
           <ul
             aria-label="Patients List"
-            className="space-y-2"
+            className="m-0 w-full list-none p-0"
           >
-            {filteredPatients.map((patient) => {
+            {topSpacerHeight > 0 && (
+              <li style={{ height: `${topSpacerHeight}px` }} aria-hidden="true" />
+            )}
+            {visibleSlice.map((patient) => {
               const isSelected = selectedPatient?.id === patient.id;
               if (isCollapsed) {
                 // Collapsed icon avatar representation
                 return (
-                  <li key={patient.id} className="list-none">
+                  <li key={patient.id} className="list-none pb-2">
                     <button
                       type="button"
                       aria-pressed={isSelected}
                       onClick={() => onSelectPatient(patient)}
                       title={`${patient.name} (${patient.bed}) · ${patient.riskScore}% risk`}
                       className={cn(
-                        'relative grid size-11 place-items-center rounded-xl text-xs font-bold transition-all mx-auto',
+                        'relative mx-auto grid size-11 min-h-[44px] min-w-[44px] place-items-center rounded-xl text-xs font-bold transition-[background-color,box-shadow,color,transform] duration-150 active:scale-[0.96]',
                         isSelected
-                          ? 'bg-white shadow-md ring-2 ring-violet-500 text-slate-800'
+                          ? 'bg-white text-slate-800 shadow-md ring-2 ring-violet-500'
                           : 'bg-white/60 text-slate-600 hover:bg-white',
                       )}
                     >
                       <span
                         className={cn(
                           'absolute right-1 top-1 size-2 rounded-full',
-                          patient.riskLevel === 'critical' && 'bg-rose-500 animate-pulse',
+                          patient.riskLevel === 'critical' && 'animate-pulse bg-rose-500',
                           patient.riskLevel === 'moderate' && 'bg-amber-400',
                           patient.riskLevel === 'stable' && 'bg-emerald-400',
                         )}
@@ -273,14 +387,18 @@ export function PatientSidebar({
               }
 
               return (
-                <PatientCard
-                  key={patient.id}
-                  patient={patient}
-                  isSelected={isSelected}
-                  onSelect={onSelectPatient}
-                />
+                <div key={patient.id} className="pb-2">
+                  <PatientCard
+                    patient={patient}
+                    isSelected={isSelected}
+                    onSelect={onSelectPatient}
+                  />
+                </div>
               );
             })}
+            {bottomSpacerHeight > 0 && (
+              <li style={{ height: `${bottomSpacerHeight}px` }} aria-hidden="true" />
+            )}
           </ul>
         )}
       </div>
@@ -303,7 +421,7 @@ export function PatientSidebar({
             size="icon"
             onClick={() => handleCycle('prev')}
             title="Previous patient (Shortcut: [ )"
-            className="size-8 rounded-lg text-slate-500 hover:bg-white"
+            className="size-10 min-h-[40px] min-w-[40px] rounded-xl text-slate-500 transition-[color,background-color,transform] duration-150 hover:bg-white active:scale-[0.96]"
           >
             <ChevronLeft className="size-4" />
           </Button>
@@ -312,7 +430,7 @@ export function PatientSidebar({
             size="icon"
             onClick={() => handleCycle('next')}
             title="Next patient (Shortcut: ] )"
-            className="size-8 rounded-lg text-slate-500 hover:bg-white"
+            className="size-10 min-h-[40px] min-w-[40px] rounded-xl text-slate-500 transition-[color,background-color,transform] duration-150 hover:bg-white active:scale-[0.96]"
           >
             <ChevronRight className="size-4" />
           </Button>

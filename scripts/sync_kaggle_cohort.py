@@ -37,7 +37,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 DEFAULT_DATASET_SLUG = "pallachetanareddy/icu-patient-vitals-monitoring-dataset"
-TARGET_COHORT_SIZE = 24
+TARGET_COHORT_SIZE = 500
 
 SAMPLE_NAMES = [
     "Aarav Rao",
@@ -64,6 +64,27 @@ SAMPLE_NAMES = [
     "Yuki Tanaka",
     "Chloe Dubois",
     "Kwame Mensah",
+]
+
+EXPANDED_FIRST_NAMES_M = [
+    "Mateo", "Kenji", "Tariq", "Ethan", "Gabriel", "Liam", "Samuel", "Daniel",
+    "Leo", "Julian", "Kai", "Carlos", "Sanjay", "Ibrahim", "Reza", "Vikram",
+    "Jonas", "Arthur", "Felix", "Oscar", "Arjun", "Kofi", "Zayd", "Tomas",
+    "Magnus", "Emil", "Rohan", "Dante", "Soren", "Hugo", "Nikolai", "Kenzo"
+]
+
+EXPANDED_FIRST_NAMES_F = [
+    "Sarah", "Aisha", "Maya", "Emily", "Lin", "Nadia", "Zoe", "Lucia",
+    "Freja", "Leila", "Nina", "Yasmine", "Hana", "Keiko", "Astrid", "Tara",
+    "Olivia", "Emma", "Ava", "Mia", "Nora", "Hannah", "Layla", "Clara",
+    "Sunita", "Amira", "Ingrid", "Chioma", "Valeria", "Amina", "Eleni", "Sakura"
+]
+
+EXPANDED_LAST_NAMES = [
+    "Kim", "Garcia", "Muller", "Santos", "Johansson", "Kowalski", "Sharma", "Nguyen",
+    "Ali", "O'Connor", "Silva", "Martinez", "Fischer", "Takahashi", "Diallo", "Larsen",
+    "Novak", "Bernard", "Alvarez", "Hansen", "Moreau", "Dubois", "Nakamura", "Costa",
+    "Lindqvist", "Bauer", "Abebe", "Gomez", "Kuznetsov", "Svensson", "Popov", "Torres"
 ]
 
 DEFAULT_UNITS = [
@@ -677,43 +698,60 @@ def build_deterministic_cohort(
             f"{len(crit_candidates)} critical, {len(mod_candidates)} moderate, {len(stab_candidates)} stable"
         )
 
-        target_critical = 7
-        target_moderate = 8
-        target_stable = count - target_critical - target_moderate  # 9
-
-        def sample_list(source: List[Dict[str, Any]], n: int) -> List[Dict[str, Any]]:
-            if not source:
-                return []
-            step = max(1, len(source) // n)
-            return [source[(i * step) % len(source)] for i in range(n)]
-
-        selected_crit = sample_list(crit_candidates, target_critical)
-        selected_mod = sample_list(mod_candidates, target_moderate)
-        selected_stab = sample_list(stab_candidates, target_stable)
-
-        # Interleave into authentic 24-bed ICU distribution
         selected_pool: List[Dict[str, Any]] = []
-        for i in range(count):
-            if i % 3 == 0 and selected_crit:
-                selected_pool.append(selected_crit.pop(0))
-            elif i % 3 == 1 and selected_mod:
-                selected_pool.append(selected_mod.pop(0))
-            elif selected_stab:
-                selected_pool.append(selected_stab.pop(0))
-            elif selected_crit:
-                selected_pool.append(selected_crit.pop(0))
-            elif selected_mod:
-                selected_pool.append(selected_mod.pop(0))
 
-        # Backfill if any slots remain
-        all_remaining = [
-            c for c in (crit_candidates + mod_candidates + stab_candidates)
-            if c not in selected_pool
-        ]
-        while len(selected_pool) < count and all_remaining:
-            selected_pool.append(all_remaining.pop(0))
+        if count >= len(patient_readings):
+            # Include all patients from the real Kaggle source
+            # Interleave critical, moderate, stable to ensure clinical diversity throughout the roster
+            c_pool = list(crit_candidates)
+            m_pool = list(mod_candidates)
+            s_pool = list(stab_candidates)
 
-        selected_pool = selected_pool[:count]
+            while c_pool or m_pool or s_pool:
+                if c_pool:
+                    selected_pool.append(c_pool.pop(0))
+                if m_pool:
+                    selected_pool.append(m_pool.pop(0))
+                if s_pool:
+                    selected_pool.append(s_pool.pop(0))
+
+            selected_pool = selected_pool[:count]
+        else:
+            # Documented optional smaller cohort for local development (e.g., --cohort-size 24)
+            target_critical = max(1, round(count * 0.30))
+            target_moderate = max(1, round(count * 0.35))
+            target_stable = max(1, count - target_critical - target_moderate)
+
+            def sample_list(source: List[Dict[str, Any]], n: int) -> List[Dict[str, Any]]:
+                if not source:
+                    return []
+                step = max(1, len(source) // n)
+                return [source[(i * step) % len(source)] for i in range(n)]
+
+            selected_crit = sample_list(crit_candidates, target_critical)
+            selected_mod = sample_list(mod_candidates, target_moderate)
+            selected_stab = sample_list(stab_candidates, target_stable)
+
+            for i in range(count):
+                if i % 3 == 0 and selected_crit:
+                    selected_pool.append(selected_crit.pop(0))
+                elif i % 3 == 1 and selected_mod:
+                    selected_pool.append(selected_mod.pop(0))
+                elif selected_stab:
+                    selected_pool.append(selected_stab.pop(0))
+                elif selected_crit:
+                    selected_pool.append(selected_crit.pop(0))
+                elif selected_mod:
+                    selected_pool.append(selected_mod.pop(0))
+
+            all_remaining = [
+                c for c in (crit_candidates + mod_candidates + stab_candidates)
+                if c not in selected_pool
+            ]
+            while len(selected_pool) < count and all_remaining:
+                selected_pool.append(all_remaining.pop(0))
+
+            selected_pool = selected_pool[:count]
 
         # Format into full PatientRecord schema
         records: List[Dict[str, Any]] = []
@@ -729,18 +767,46 @@ def build_deterministic_cohort(
             raw = item["raw_item"]
 
             patient_id = f"EHR-{9001 + idx}"
-            name = SAMPLE_NAMES[idx % len(SAMPLE_NAMES)]
+            kaggle_pid = item.get("patient_id") or raw.get("patient_id")
+
+            # Deterministic unique name generation
+            if idx < len(SAMPLE_NAMES):
+                name = SAMPLE_NAMES[idx]
+            else:
+                offset = idx - len(SAMPLE_NAMES)
+                gender_hint = m.get("gender") or raw.get("gender")
+                if gender_hint == "F":
+                    first_list = EXPANDED_FIRST_NAMES_F
+                elif gender_hint == "M":
+                    first_list = EXPANDED_FIRST_NAMES_M
+                else:
+                    first_list = (
+                        EXPANDED_FIRST_NAMES_F
+                        if (offset % 2 == 1)
+                        else EXPANDED_FIRST_NAMES_M
+                    )
+                f_idx = (offset // len(EXPANDED_LAST_NAMES)) % len(first_list)
+                l_idx = offset % len(EXPANDED_LAST_NAMES)
+                name = f"{first_list[f_idx]} {EXPANDED_LAST_NAMES[l_idx]}"
 
             # Demographic & Unit resolution: Metadata -> Vitals -> Fallback
             age = m.get("age") or raw.get("age") or (32 + ((idx * 7) % 46))
-            unit_val = m.get("unit") or raw.get("icu_unit") or DEFAULT_UNITS[idx % len(DEFAULT_UNITS)]
+            unit_val = (
+                m.get("unit")
+                or raw.get("icu_unit")
+                or DEFAULT_UNITS[idx % len(DEFAULT_UNITS)]
+            )
             if unit_val in UNIT_NAME_MAP:
                 unit_val = UNIT_NAME_MAP[unit_val]
 
             bed = f"Bed {(idx + 1):02d}"
 
             # Admission timestamp resolution
-            admitted = m.get("admitted") or raw.get("admission_time") or raw.get("timestamp")
+            admitted = (
+                m.get("admitted")
+                or raw.get("admission_time")
+                or raw.get("timestamp")
+            )
             if admitted and len(admitted) > 16:
                 admitted = admitted[:16]
             if not admitted:
@@ -749,6 +815,7 @@ def build_deterministic_cohort(
             records.append(
                 {
                     "id": patient_id,
+                    "kaggleId": kaggle_pid,
                     "name": name,
                     "age": age,
                     "unit": unit_val,
@@ -777,9 +844,9 @@ def build_deterministic_cohort(
     moderate = [x for x in scored if x["level"] == "moderate"]
     stable = [x for x in scored if x["level"] == "stable"]
 
-    target_critical = 7
-    target_moderate = 8
-    target_stable = count - target_critical - target_moderate
+    target_critical = max(1, round(count * 0.30))
+    target_moderate = max(1, round(count * 0.35))
+    target_stable = max(1, count - target_critical - target_moderate)
 
     def take(source: List[Dict[str, Any]], num: int) -> List[Dict[str, Any]]:
         if not source:
@@ -818,7 +885,19 @@ def build_deterministic_cohort(
         factors = compute_risk_factors(v, derived)
 
         patient_id = f"EHR-{9001 + idx}"
-        name = SAMPLE_NAMES[idx % len(SAMPLE_NAMES)]
+        if idx < len(SAMPLE_NAMES):
+            name = SAMPLE_NAMES[idx]
+        else:
+            offset = idx - len(SAMPLE_NAMES)
+            first_list = (
+                EXPANDED_FIRST_NAMES_F
+                if (offset % 2 == 1)
+                else EXPANDED_FIRST_NAMES_M
+            )
+            f_idx = (offset // len(EXPANDED_LAST_NAMES)) % len(first_list)
+            l_idx = offset % len(EXPANDED_LAST_NAMES)
+            name = f"{first_list[f_idx]} {EXPANDED_LAST_NAMES[l_idx]}"
+
         unit = DEFAULT_UNITS[idx % len(DEFAULT_UNITS)]
         bed = f"Bed {(idx + 1):02d}"
         age = 32 + ((idx * 7) % 46)
@@ -844,7 +923,7 @@ def build_deterministic_cohort(
     return records
 
 
-def verify_cohort_file(file_path: Path) -> bool:
+def verify_cohort_file(file_path: Path, expected_size: int = TARGET_COHORT_SIZE) -> bool:
     """Verify validity and consistency of the demo cohort file."""
     if not file_path.is_file():
         print(f"[VERIFY FAIL] File does not exist: {file_path}")
@@ -861,9 +940,9 @@ def verify_cohort_file(file_path: Path) -> bool:
         print("[VERIFY FAIL] Root JSON is not an array")
         return False
 
-    if len(data) != TARGET_COHORT_SIZE:
+    if len(data) != expected_size:
         print(
-            f"[VERIFY FAIL] Expected {TARGET_COHORT_SIZE} records, found {len(data)}"
+            f"[VERIFY FAIL] Expected {expected_size} records, found {len(data)}"
         )
         return False
 
@@ -914,6 +993,14 @@ def main() -> int:
         help=f"Kaggle dataset slug (default: {DEFAULT_DATASET_SLUG})",
     )
     parser.add_argument(
+        "--cohort-size",
+        "--limit",
+        type=int,
+        default=TARGET_COHORT_SIZE,
+        dest="cohort_size",
+        help=f"Cohort size to generate (default: {TARGET_COHORT_SIZE}; e.g., 24 for smaller local dev cohort)",
+    )
+    parser.add_argument(
         "--input-csv",
         type=Path,
         default=None,
@@ -948,12 +1035,13 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.verify_only:
-        success = verify_cohort_file(args.output)
+        success = verify_cohort_file(args.output, expected_size=args.cohort_size)
         return 0 if success else 1
 
     print("=" * 70)
     print("ICU PATIENT MONITORING PLATFORM - ETL SYNC PIPELINE")
     print(f"Target Dataset : {args.dataset}")
+    print(f"Cohort Size    : {args.cohort_size}")
     print(f"Output File    : {args.output}")
     print("=" * 70)
 
@@ -1025,18 +1113,18 @@ def main() -> int:
                 temp_dir_obj = tempfile.TemporaryDirectory()
                 temp_dir = Path(temp_dir_obj.name)
 
-                # Try kagglehub first
-                downloaded_dir = download_dataset_via_kagglehub(args.dataset)
+                # Prioritize direct REST download into temp_dir to guarantee no cache files remain outside temp
+                downloaded_dir = download_dataset_via_rest(
+                    args.dataset, username, key, temp_dir
+                )
                 if not downloaded_dir:
-                    # Try official Kaggle API package
+                    # Try official Kaggle API package targeting temp_dir
                     downloaded_dir = download_dataset_via_kaggle_api(
                         args.dataset, temp_dir
                     )
                 if not downloaded_dir:
-                    # Download via Kaggle REST endpoint
-                    downloaded_dir = download_dataset_via_rest(
-                        args.dataset, username, key, temp_dir
-                    )
+                    # Try kagglehub as last resort
+                    downloaded_dir = download_dataset_via_kagglehub(args.dataset)
 
                 if downloaded_dir:
                     vitals_csv_path, meta_csv_path = locate_dataset_csvs(
@@ -1082,9 +1170,9 @@ def main() -> int:
             print(f"[ETL] Generated {len(raw_rows):,} benchmark rows.")
             used_actual_kaggle = False
 
-        print(f"[ETL] Building balanced {TARGET_COHORT_SIZE}-patient cohort...")
+        print(f"[ETL] Building balanced {args.cohort_size}-patient cohort...")
         cohort = build_deterministic_cohort(
-            raw_rows, metadata=metadata_by_id, count=TARGET_COHORT_SIZE
+            raw_rows, metadata=metadata_by_id, count=args.cohort_size
         )
 
         # Ensure target directory exists
@@ -1099,7 +1187,7 @@ def main() -> int:
         )
 
         # Verify output
-        if verify_cohort_file(args.output):
+        if verify_cohort_file(args.output, expected_size=args.cohort_size):
             source_desc = (
                 "actual Kaggle ICU dataset (patient_vitals.csv + patients_meta.csv)"
                 if used_actual_kaggle

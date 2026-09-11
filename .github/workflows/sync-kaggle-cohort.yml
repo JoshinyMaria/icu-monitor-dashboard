@@ -85,13 +85,13 @@ jobs:
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: 'chore(data): sync 24-patient cohort from Kaggle dataset [skip ci]'
+          commit-message: 'chore(data): sync 500-patient cohort from Kaggle dataset [skip ci]'
           title: 'Automated Sync: Kaggle ICU Patient Cohort'
           body: |
             ### Automated ICU Cohort Sync
             - Source dataset: [`pallachetanareddy/icu-patient-vitals-monitoring-dataset`](https://www.kaggle.com/datasets/pallachetanareddy/icu-patient-vitals-monitoring-dataset)
             - Pipeline script: `scripts/sync_kaggle_cohort.py`
-            - Generated artifact: `public/data/demo-cohort.json` (24 patients)
+            - Generated artifact: `public/data/demo-cohort.json` (500 patients)
             - Ground truth parity: verified with sensor fusion indicators & deterioration scoring
           branch: automated/kaggle-cohort-sync
           delete-branch: true

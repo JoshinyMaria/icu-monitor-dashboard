@@ -32,7 +32,7 @@ export function PatientCycleControls({
           size="sm"
           onClick={onPrevious}
           disabled={totalCount <= 1}
-          className="h-8 flex-1 rounded-xl border-white bg-white/70 text-xs font-medium text-slate-700 hover:bg-white"
+          className="h-10 min-h-[40px] flex-1 rounded-xl border-white bg-white/70 text-xs font-medium text-slate-700 transition-[color,background-color,border-color,transform] duration-150 hover:bg-white active:scale-[0.96]"
           title="Previous patient (Shortcut: [ )"
           aria-label="Previous patient"
         >
@@ -41,7 +41,7 @@ export function PatientCycleControls({
           <Kbd className="ml-1 hidden text-[9px] sm:inline-block">[</Kbd>
         </Button>
 
-        <span className="shrink-0 px-2 font-mono text-[11px] font-semibold text-slate-500">
+        <span className="shrink-0 px-2 font-mono text-[11px] font-semibold tabular-nums text-slate-500">
           {totalCount > 0 ? `${currentIndex + 1} / ${totalCount}` : '0 / 0'}
         </span>
 
@@ -50,7 +50,7 @@ export function PatientCycleControls({
           size="sm"
           onClick={onNext}
           disabled={totalCount <= 1}
-          className="h-8 flex-1 rounded-xl border-white bg-white/70 text-xs font-medium text-slate-700 hover:bg-white"
+          className="h-10 min-h-[40px] flex-1 rounded-xl border-white bg-white/70 text-xs font-medium text-slate-700 transition-[color,background-color,border-color,transform] duration-150 hover:bg-white active:scale-[0.96]"
           title="Next patient (Shortcut: ] )"
           aria-label="Next patient"
         >
@@ -66,10 +66,10 @@ export function PatientCycleControls({
             variant="ghost"
             size="sm"
             onClick={onJumpCritical}
-            className="h-7 flex-1 rounded-lg bg-rose-50/70 text-[11px] font-medium text-rose-600 hover:bg-rose-100 hover:text-rose-700"
+            className="h-10 min-h-[40px] flex-1 rounded-xl bg-rose-50/80 text-[11px] font-medium text-rose-600 transition-[color,background-color,transform] duration-150 hover:bg-rose-100 hover:text-rose-700 active:scale-[0.96]"
             title="Jump to next critical patient (Shortcut: Alt+C)"
           >
-            <Zap className="mr-1 size-3 fill-rose-500 text-rose-500" />
+            <Zap className="mr-1 size-3.5 fill-rose-500 text-rose-500" />
             <span>Next Critical</span>
             <Kbd className="ml-auto text-[9px]">Alt+C</Kbd>
           </Button>
@@ -79,10 +79,10 @@ export function PatientCycleControls({
           variant="ghost"
           size="sm"
           onClick={onUploadClick}
-          className="h-7 rounded-lg px-2 text-[11px] text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+          className="h-10 min-h-[40px] min-w-[40px] rounded-xl px-2 text-[11px] text-slate-500 transition-[color,background-color,transform] duration-150 hover:bg-slate-100 hover:text-slate-800 active:scale-[0.96]"
           title="Import CSV or TXT cohort"
         >
-          <Upload className="size-3" />
+          <Upload className="size-3.5" />
         </Button>
       </div>
     </div>

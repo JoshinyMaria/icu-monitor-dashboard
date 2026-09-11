@@ -767,7 +767,7 @@ export function IcuDashboard() {
       {/* Main Fluid Bedside View */}
       <div
         className={cn(
-          'relative transition-all duration-300',
+          'relative transition-[padding] duration-300',
           isSidebarCollapsed
             ? 'lg:pl-[72px]'
             : 'lg:pl-[310px] xl:pl-[330px]',
