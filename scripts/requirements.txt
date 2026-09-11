@@ -1,0 +1,11 @@
+# Dependencies for ICU Patient Monitoring Dataset ETL Pipeline
+# Kaggle dataset: https://www.kaggle.com/datasets/pallachetanareddy/icu-patient-vitals-monitoring-dataset
+
+# Official Kaggle SDKs (Optional: script supports both or falls back to Kaggle HTTP REST API)
+kagglehub>=0.3.0
+kaggle>=1.6.0
+
+# Data manipulation and HTTP client (Optional: script works with standard library csv/json/urllib as well)
+requests>=2.31.0
+pandas>=2.0.0
+numpy>=1.24.0

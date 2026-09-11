@@ -1,0 +1,100 @@
+name: Sync Kaggle ICU Cohort
+
+on:
+  # Manual on-demand execution via GitHub Actions UI
+  workflow_dispatch:
+    inputs:
+      force_regenerate:
+        description: 'Force cohort regeneration even if dataset is cached'
+        required: false
+        type: boolean
+        default: false
+  # Weekly automated sync every Sunday at 04:00 UTC
+  schedule:
+    - cron: '0 4 * * 0'
+
+# Default to minimum read-only permissions for safety
+permissions:
+  contents: read
+
+jobs:
+  sync-cohort:
+    name: Sync and Normalize ICU Cohort
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch full history if needed for deliberate commit step
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'scripts/requirements.txt'
+
+      - name: Install ETL dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r scripts/requirements.txt
+
+      - name: Execute Kaggle ETL sync
+        id: run_etl
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+        run: |
+          echo "Starting ICU patient cohort ETL..."
+          python scripts/sync_kaggle_cohort.py \
+            --dataset "pallachetanareddy/icu-patient-vitals-monitoring-dataset" \
+            --output "public/data/demo-cohort.json"
+
+      - name: Verify generated cohort
+        run: |
+          python scripts/sync_kaggle_cohort.py --verify-only --output "public/data/demo-cohort.json"
+
+      - name: Upload cohort artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: icu-demo-cohort-json
+          path: public/data/demo-cohort.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Check for working tree changes
+        id: git_diff
+        run: |
+          if git diff --quiet public/data/demo-cohort.json; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "Cohort is up to date; no changes detected."
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Changes detected in public/data/demo-cohort.json"
+            git status --short public/data/demo-cohort.json
+          fi
+
+      # Safe, scoped pull request creation (only when changes exist)
+      # To enable this step, ensure repository settings grant "Read and write permissions"
+      # to GITHUB_TOKEN under Settings -> Actions -> General -> Workflow permissions.
+      - name: Create Pull Request with updated cohort (Optional / Scoped)
+        if: steps.git_diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore(data): sync 24-patient cohort from Kaggle dataset [skip ci]'
+          title: 'Automated Sync: Kaggle ICU Patient Cohort'
+          body: |
+            ### Automated ICU Cohort Sync
+            - Source dataset: [`pallachetanareddy/icu-patient-vitals-monitoring-dataset`](https://www.kaggle.com/datasets/pallachetanareddy/icu-patient-vitals-monitoring-dataset)
+            - Pipeline script: `scripts/sync_kaggle_cohort.py`
+            - Generated artifact: `public/data/demo-cohort.json` (24 patients)
+            - Ground truth parity: verified with sensor fusion indicators & deterioration scoring
+          branch: automated/kaggle-cohort-sync
+          delete-branch: true
+          labels: |
+            automated
+            data-sync

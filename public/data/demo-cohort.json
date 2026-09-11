@@ -1,0 +1,862 @@
+[
+  {
+    "id": "EHR-9001",
+    "name": "Aarav Rao",
+    "age": 41,
+    "unit": "Cardiovascular ICU",
+    "bed": "Bed 01",
+    "admitted": "2025-02-28 00:00",
+    "baselineVitals": {
+      "hr": 81,
+      "spo2": 97,
+      "temp": 37.1,
+      "systolic": 128,
+      "diastolic": 75,
+      "rr": 18,
+      "ecg": 0
+    },
+    "currentVitals": {
+      "hr": 118,
+      "spo2": 87,
+      "temp": 37.2,
+      "systolic": 124,
+      "diastolic": 77,
+      "rr": 35,
+      "ecg": 0
+    },
+    "derived": {
+      "shockIndex": 0.95,
+      "map": 92.7,
+      "pulsePressure": 47
+    },
+    "riskScore": 98,
+    "riskLevel": "critical",
+    "factors": [
+      "Elevated Shock Index (0.95)",
+      "Hypoxemia (87% SpO\u2082)",
+      "Rapid respiration (35/min)"
+    ]
+  },
+  {
+    "id": "EHR-9002",
+    "name": "Elena Rostova",
+    "age": 49,
+    "unit": "Cardiovascular ICU",
+    "bed": "Bed 02",
+    "admitted": "2025-01-01 05:00",
+    "baselineVitals": {
+      "hr": 82,
+      "spo2": 97,
+      "temp": 36.7,
+      "systolic": 118,
+      "diastolic": 65,
+      "rr": 13,
+      "ecg": 0
+    },
+    "currentVitals": {
+      "hr": 113,
+      "spo2": 91,
+      "temp": 37.7,
+      "systolic": 103,
+      "diastolic": 59,
+      "rr": 22,
+      "ecg": 0
+    },
+    "derived": {
+      "shockIndex": 1.1,
+      "map": 73.7,
+      "pulsePressure": 44
+    },
+    "riskScore": 58,
+    "riskLevel": "moderate",
+    "factors": [
+      "Elevated Shock Index (1.10)"
+    ]
+  },
+  {
+    "id": "EHR-9003",
+    "name": "Marcus Vance",
+    "age": 78,
+    "unit": "Medical ICU",
+    "bed": "Bed 03",
+    "admitted": "2025-01-02 14:00",
+    "baselineVitals": {
+      "hr": 79,
+      "spo2": 96,
+      "temp": 36.7,
+      "systolic": 131,
+      "diastolic": 82,
+      "rr": 19,
+      "ecg": 0
+    },
+    "currentVitals": {
+      "hr": 84,
+      "spo2": 96,
+      "temp": 37.1,
+      "systolic": 137,
+      "diastolic": 86,
+      "rr": 22,
+      "ecg": 0
+    },
+    "derived": {
+      "shockIndex": 0.61,
+      "map": 103.0,
+      "pulsePressure": 51
+    },
+    "riskScore": 13,
+    "riskLevel": "stable",
+    "factors": []
+  },
+  {
+    "id": "EHR-9004",
+    "name": "Amara Okafor",
+    "age": 68,
+    "unit": "Cardiovascular ICU",
+    "bed": "Bed 04",
+    "admitted": "2025-02-12 09:00",
+    "baselineVitals": {
+      "hr": 62,
+      "spo2": 95,
+      "temp": 36.8,
+      "systolic": 112,
+      "diastolic": 77,
+      "rr": 18,
+      "ecg": 0
+    },
+    "currentVitals": {
+      "hr": 109,
+      "spo2": 90,
+      "temp": 39.1,
+      "systolic": 100,
+      "diastolic": 71,
+      "rr": 32,
+      "ecg": 0
+    },
+    "derived": {
+      "shockIndex": 1.09,
+      "map": 80.7,
+      "pulsePressure": 29
+    },
+    "riskScore": 98,
+    "riskLevel": "critical",
+    "factors": [
+      "Elevated Shock Index (1.09)",
+      "High temperature (39.1\u00b0C)",
+      "Rapid respiration (32/min)"
+    ]
+  },
+  {
+    "id": "EHR-9005",
+    "name": "David Chen",
+    "age": 28,
+    "unit": "Cardiovascular ICU",
+    "bed": "Bed 05",
+    "admitted": "2025-01-22 10:00",
+    "baselineVitals": {
+      "hr": 81,
+      "spo2": 97,
+      "temp": 37.3,
+      "systolic": 101,
+      "diastolic": 71,
+      "rr": 13,
+      "ecg": 1
+    },
+    "currentVitals": {
+      "hr": 90,
+      "spo2": 97,
+      "temp": 37.6,
+      "systolic": 101,
+      "diastolic": 72,
+      "rr": 15,
+      "ecg": 1
+    },
+    "derived": {
+      "shockIndex": 0.89,
+      "map": 81.7,
+      "pulsePressure": 29
+    },
+    "riskScore": 31,
+    "riskLevel": "moderate",
+    "factors": [
+      "Arrhythmia detected"
+    ]
+  },
+  {
+    "id": "EHR-9006",
+    "name": "Sofia Morales",
+    "age": 77,
+    "unit": "Medical ICU",
+    "bed": "Bed 06",
+    "admitted": "2025-02-11 05:00",
+    "baselineVitals": {
+      "hr": 73,
+      "spo2": 95,
+      "temp": 36.9,
+      "systolic": 123,
+      "diastolic": 71,
+      "rr": 19,
+      "ecg": 0
+    },
+    "currentVitals": {
+      "hr": 76,
+      "spo2": 94,
+      "temp": 37.2,
+      "systolic": 124,
+      "diastolic": 74,
+      "rr": 23,
+      "ecg": 0
+    },
+    "derived": {
+      "shockIndex": 0.61,
+      "map": 90.7,
+      "pulsePressure": 50
+    },
+    "riskScore": 16,
+    "riskLevel": "stable",
+    "factors": []
+  },
+  {
+    "id": "EHR-9007",
+    "name": "James Wilson",
+    "age": 84,
+    "unit": "Neuro ICU",
+    "bed": "Bed 07",
+    "admitted": "2025-02-25 07:00",
+    "baselineVitals": {
+      "hr": 94,
+      "spo2": 93,
+      "temp": 36.8,
+      "systolic": 114,
+      "diastolic": 78,
+      "rr": 21,
+      "ecg": 0
+    },
+    "currentVitals": {
+      "hr": 118,
+      "spo2": 88,
+      "temp": 36.8,
+      "systolic": 105,
+      "diastolic": 75,
+      "rr": 32,
+      "ecg": 0
+    },
+    "derived": {
+      "shockIndex": 1.12,
+      "map": 85.0,
+      "pulsePressure": 30
+    },
+    "riskScore": 98,
+    "riskLevel": "critical",
+    "factors": [
+      "Elevated Shock Index (1.12)",
+      "Hypoxemia (88% SpO\u2082)",
+      "Rapid respiration (32/min)"
+    ]
+  },
+  {
+    "id": "EHR-9008",
+    "name": "Priya Patel",
+    "age": 26,
+    "unit": "Neuro ICU",
+    "bed": "Bed 08",
+    "admitted": "2025-02-17 14:00",
+    "baselineVitals": {
+      "hr": 64,
+      "spo2": 96,
+      "temp": 36.6,
+      "systolic": 115,
+      "diastolic": 77,
+      "rr": 15,
+      "ecg": 0
+    },
+    "currentVitals": {
+      "hr": 97,
+      "spo2": 90,
+      "temp": 37.7,
+      "systolic": 104,
+      "diastolic": 72,
+      "rr": 25,
+      "ecg": 0
+    },
+    "derived": {
+      "shockIndex": 0.93,
+      "map": 82.7,
+      "pulsePressure": 32
+    },
+    "riskScore": 59,
+    "riskLevel": "moderate",
+    "factors": [
+      "Elevated Shock Index (0.93)",
+      "Rapid respiration (25/min)"
+    ]
+  },
+  {
+    "id": "EHR-9009",
+    "name": "Lucas Becker",
+    "age": 27,
+    "unit": "Cardiovascular ICU",
+    "bed": "Bed 09",
+    "admitted": "2025-02-26 05:00",
+    "baselineVitals": {
+      "hr": 63,
+      "spo2": 95,
+      "temp": 36.7,
+      "systolic": 107,
+      "diastolic": 63,
+      "rr": 13,
+      "ecg": 0
+    },
+    "currentVitals": {
+      "hr": 63,
+      "spo2": 95,
+      "temp": 36.7,
+      "systolic": 107,
+      "diastolic": 63,
+      "rr": 13,
+      "ecg": 0
+    },
+    "derived": {
+      "shockIndex": 0.59,
+      "map": 77.7,
+      "pulsePressure": 44
+    },
+    "riskScore": 8,
+    "riskLevel": "stable",
+    "factors": []
+  },
+  {
+    "id": "EHR-9010",
+    "name": "Fatima Zahra",
+    "age": 42,
+    "unit": "Neuro ICU",
+    "bed": "Bed 10",
+    "admitted": "2025-02-26 07:00",
+    "baselineVitals": {
+      "hr": 66,
+      "spo2": 99,
+      "temp": 37.1,
+      "systolic": 101,
+      "diastolic": 61,
+      "rr": 11,
+      "ecg": 0
+    },
+    "currentVitals": {
+      "hr": 105,
+      "spo2": 95,
+      "temp": 37.0,
+      "systolic": 66,
+      "diastolic": 41,
+      "rr": 15,
+      "ecg": 0
+    },
+    "derived": {
+      "shockIndex": 1.59,
+      "map": 49.3,
+      "pulsePressure": 25
+    },
+    "riskScore": 97,
+    "riskLevel": "critical",
+    "factors": [
+      "Elevated Shock Index (1.59)",
+      "Low MAP (49 mmHg)"
+    ]
+  },
+  {
+    "id": "EHR-9011",
+    "name": "William Taylor",
+    "age": 71,
+    "unit": "Cardiovascular ICU",
+    "bed": "Bed 11",
+    "admitted": "2025-01-06 11:00",
+    "baselineVitals": {
+      "hr": 76,
+      "spo2": 98,
+      "temp": 36.5,
+      "systolic": 134,
+      "diastolic": 80,
+      "rr": 13,
+      "ecg": 0
+    },
+    "currentVitals": {
+      "hr": 107,
+      "spo2": 91,
+      "temp": 37.7,
+      "systolic": 121,
+      "diastolic": 75,
+      "rr": 22,
+      "ecg": 0
+    },
+    "derived": {
+      "shockIndex": 0.88,
+      "map": 90.3,
+      "pulsePressure": 46
+    },
+    "riskScore": 42,
+    "riskLevel": "moderate",
+    "factors": []
+  },
+  {
+    "id": "EHR-9012",
+    "name": "Mei-Ling Zhou",
+    "age": 26,
+    "unit": "Surgical ICU",
+    "bed": "Bed 12",
+    "admitted": "2025-01-24 01:00",
+    "baselineVitals": {
+      "hr": 85,
+      "spo2": 97,
+      "temp": 36.8,
+      "systolic": 127,
+      "diastolic": 71,
+      "rr": 18,
+      "ecg": 0
+    },
+    "currentVitals": {
+      "hr": 85,
+      "spo2": 97,
+      "temp": 36.8,
+      "systolic": 127,
+      "diastolic": 71,
+      "rr": 18,
+      "ecg": 0
+    },
+    "derived": {
+      "shockIndex": 0.67,
+      "map": 89.7,
+      "pulsePressure": 56
+    },
+    "riskScore": 8,
+    "riskLevel": "stable",
+    "factors": []
+  },
+  {
+    "id": "EHR-9013",
+    "name": "Alexander Scott",
+    "age": 49,
+    "unit": "Surgical ICU",
+    "bed": "Bed 13",
+    "admitted": "2025-01-15 22:00",
+    "baselineVitals": {
+      "hr": 91,
+      "spo2": 93,
+      "temp": 37.7,
+      "systolic": 105,
+      "diastolic": 71,
+      "rr": 18,
+      "ecg": 1
+    },
+    "currentVitals": {
+      "hr": 120,
+      "spo2": 89,
+      "temp": 38.6,
+      "systolic": 97,
+      "diastolic": 61,
+      "rr": 26,
+      "ecg": 1
+    },
+    "derived": {
+      "shockIndex": 1.24,
+      "map": 73.0,
+      "pulsePressure": 36
+    },
+    "riskScore": 98,
+    "riskLevel": "critical",
+    "factors": [
+      "Elevated Shock Index (1.24)",
+      "Hypoxemia (89% SpO\u2082)",
+      "High temperature (38.6\u00b0C)",
+      "Rapid respiration (26/min)",
+      "Arrhythmia detected"
+    ]
+  },
+  {
+    "id": "EHR-9014",
+    "name": "Ananya Iyer",
+    "age": 84,
+    "unit": "Surgical ICU",
+    "bed": "Bed 14",
+    "admitted": "2025-01-26 15:00",
+    "baselineVitals": {
+      "hr": 80,
+      "spo2": 96,
+      "temp": 36.8,
+      "systolic": 120,
+      "diastolic": 72,
+      "rr": 15,
+      "ecg": 0
+    },
+    "currentVitals": {
+      "hr": 113,
+      "spo2": 90,
+      "temp": 37.8,
+      "systolic": 107,
+      "diastolic": 67,
+      "rr": 24,
+      "ecg": 0
+    },
+    "derived": {
+      "shockIndex": 1.06,
+      "map": 80.3,
+      "pulsePressure": 40
+    },
+    "riskScore": 66,
+    "riskLevel": "moderate",
+    "factors": [
+      "Elevated Shock Index (1.06)"
+    ]
+  },
+  {
+    "id": "EHR-9015",
+    "name": "Benjamin Hayes",
+    "age": 35,
+    "unit": "Cardiovascular ICU",
+    "bed": "Bed 15",
+    "admitted": "2025-02-11 19:00",
+    "baselineVitals": {
+      "hr": 91,
+      "spo2": 95,
+      "temp": 37.0,
+      "systolic": 107,
+      "diastolic": 65,
+      "rr": 17,
+      "ecg": 0
+    },
+    "currentVitals": {
+      "hr": 95,
+      "spo2": 95,
+      "temp": 37.0,
+      "systolic": 103,
+      "diastolic": 64,
+      "rr": 18,
+      "ecg": 0
+    },
+    "derived": {
+      "shockIndex": 0.92,
+      "map": 77.0,
+      "pulsePressure": 39
+    },
+    "riskScore": 23,
+    "riskLevel": "stable",
+    "factors": [
+      "Elevated Shock Index (0.92)"
+    ]
+  },
+  {
+    "id": "EHR-9016",
+    "name": "Camila Vargas",
+    "age": 55,
+    "unit": "Surgical ICU",
+    "bed": "Bed 16",
+    "admitted": "2025-01-24 12:00",
+    "baselineVitals": {
+      "hr": 78,
+      "spo2": 96,
+      "temp": 37.2,
+      "systolic": 110,
+      "diastolic": 67,
+      "rr": 14,
+      "ecg": 0
+    },
+    "currentVitals": {
+      "hr": 123,
+      "spo2": 92,
+      "temp": 37.5,
+      "systolic": 80,
+      "diastolic": 52,
+      "rr": 19,
+      "ecg": 0
+    },
+    "derived": {
+      "shockIndex": 1.54,
+      "map": 61.3,
+      "pulsePressure": 28
+    },
+    "riskScore": 88,
+    "riskLevel": "critical",
+    "factors": [
+      "Elevated Shock Index (1.54)",
+      "Low MAP (61 mmHg)"
+    ]
+  },
+  {
+    "id": "EHR-9017",
+    "name": "Dmitri Volkov",
+    "age": 63,
+    "unit": "Surgical ICU",
+    "bed": "Bed 17",
+    "admitted": "2025-02-06 07:00",
+    "baselineVitals": {
+      "hr": 66,
+      "spo2": 98,
+      "temp": 37.1,
+      "systolic": 128,
+      "diastolic": 65,
+      "rr": 13,
+      "ecg": 0
+    },
+    "currentVitals": {
+      "hr": 99,
+      "spo2": 92,
+      "temp": 38.3,
+      "systolic": 116,
+      "diastolic": 61,
+      "rr": 23,
+      "ecg": 0
+    },
+    "derived": {
+      "shockIndex": 0.85,
+      "map": 79.3,
+      "pulsePressure": 55
+    },
+    "riskScore": 42,
+    "riskLevel": "moderate",
+    "factors": []
+  },
+  {
+    "id": "EHR-9018",
+    "name": "Grace Hopper",
+    "age": 36,
+    "unit": "Cardiovascular ICU",
+    "bed": "Bed 18",
+    "admitted": "2025-02-11 22:00",
+    "baselineVitals": {
+      "hr": 70,
+      "spo2": 96,
+      "temp": 37.4,
+      "systolic": 133,
+      "diastolic": 63,
+      "rr": 13,
+      "ecg": 0
+    },
+    "currentVitals": {
+      "hr": 73,
+      "spo2": 95,
+      "temp": 37.6,
+      "systolic": 131,
+      "diastolic": 65,
+      "rr": 13,
+      "ecg": 0
+    },
+    "derived": {
+      "shockIndex": 0.56,
+      "map": 87.0,
+      "pulsePressure": 66
+    },
+    "riskScore": 9,
+    "riskLevel": "stable",
+    "factors": []
+  },
+  {
+    "id": "EHR-9019",
+    "name": "Hassan Al-Mansoor",
+    "age": 51,
+    "unit": "Neuro ICU",
+    "bed": "Bed 19",
+    "admitted": "2025-01-30 04:00",
+    "baselineVitals": {
+      "hr": 92,
+      "spo2": 95,
+      "temp": 37.2,
+      "systolic": 122,
+      "diastolic": 65,
+      "rr": 17,
+      "ecg": 0
+    },
+    "currentVitals": {
+      "hr": 128,
+      "spo2": 89,
+      "temp": 38.2,
+      "systolic": 108,
+      "diastolic": 58,
+      "rr": 27,
+      "ecg": 0
+    },
+    "derived": {
+      "shockIndex": 1.19,
+      "map": 74.7,
+      "pulsePressure": 50
+    },
+    "riskScore": 91,
+    "riskLevel": "critical",
+    "factors": [
+      "Elevated Shock Index (1.19)",
+      "Hypoxemia (89% SpO\u2082)",
+      "Rapid respiration (27/min)"
+    ]
+  },
+  {
+    "id": "EHR-9020",
+    "name": "Isabella Rossi",
+    "age": 22,
+    "unit": "Surgical ICU",
+    "bed": "Bed 20",
+    "admitted": "2025-02-24 23:00",
+    "baselineVitals": {
+      "hr": 78,
+      "spo2": 96,
+      "temp": 36.9,
+      "systolic": 115,
+      "diastolic": 79,
+      "rr": 18,
+      "ecg": 0
+    },
+    "currentVitals": {
+      "hr": 100,
+      "spo2": 92,
+      "temp": 37.7,
+      "systolic": 94,
+      "diastolic": 65,
+      "rr": 25,
+      "ecg": 0
+    },
+    "derived": {
+      "shockIndex": 1.06,
+      "map": 74.7,
+      "pulsePressure": 29
+    },
+    "riskScore": 58,
+    "riskLevel": "moderate",
+    "factors": [
+      "Elevated Shock Index (1.06)",
+      "Rapid respiration (25/min)"
+    ]
+  },
+  {
+    "id": "EHR-9021",
+    "name": "Noah Andersen",
+    "age": 80,
+    "unit": "Surgical ICU",
+    "bed": "Bed 21",
+    "admitted": "2025-02-22 08:00",
+    "baselineVitals": {
+      "hr": 92,
+      "spo2": 98,
+      "temp": 36.6,
+      "systolic": 129,
+      "diastolic": 72,
+      "rr": 15,
+      "ecg": 0
+    },
+    "currentVitals": {
+      "hr": 99,
+      "spo2": 96,
+      "temp": 36.9,
+      "systolic": 132,
+      "diastolic": 77,
+      "rr": 17,
+      "ecg": 0
+    },
+    "derived": {
+      "shockIndex": 0.75,
+      "map": 95.3,
+      "pulsePressure": 55
+    },
+    "riskScore": 10,
+    "riskLevel": "stable",
+    "factors": []
+  },
+  {
+    "id": "EHR-9022",
+    "name": "Yuki Tanaka",
+    "age": 71,
+    "unit": "Pediatric ICU",
+    "bed": "Bed 22",
+    "admitted": "2025-02-21 01:00",
+    "baselineVitals": {
+      "hr": 82,
+      "spo2": 96,
+      "temp": 36.5,
+      "systolic": 124,
+      "diastolic": 83,
+      "rr": 15,
+      "ecg": 0
+    },
+    "currentVitals": {
+      "hr": 82,
+      "spo2": 96,
+      "temp": 36.5,
+      "systolic": 124,
+      "diastolic": 83,
+      "rr": 15,
+      "ecg": 0
+    },
+    "derived": {
+      "shockIndex": 0.66,
+      "map": 96.7,
+      "pulsePressure": 41
+    },
+    "riskScore": 8,
+    "riskLevel": "stable",
+    "factors": []
+  },
+  {
+    "id": "EHR-9023",
+    "name": "Chloe Dubois",
+    "age": 42,
+    "unit": "Cardiovascular ICU",
+    "bed": "Bed 23",
+    "admitted": "2025-02-05 01:00",
+    "baselineVitals": {
+      "hr": 80,
+      "spo2": 95,
+      "temp": 37.5,
+      "systolic": 130,
+      "diastolic": 75,
+      "rr": 13,
+      "ecg": 0
+    },
+    "currentVitals": {
+      "hr": 114,
+      "spo2": 92,
+      "temp": 37.2,
+      "systolic": 91,
+      "diastolic": 52,
+      "rr": 16,
+      "ecg": 0
+    },
+    "derived": {
+      "shockIndex": 1.25,
+      "map": 65.0,
+      "pulsePressure": 39
+    },
+    "riskScore": 63,
+    "riskLevel": "moderate",
+    "factors": [
+      "Elevated Shock Index (1.25)"
+    ]
+  },
+  {
+    "id": "EHR-9024",
+    "name": "Kwame Mensah",
+    "age": 31,
+    "unit": "Medical ICU",
+    "bed": "Bed 24",
+    "admitted": "2025-02-28 20:00",
+    "baselineVitals": {
+      "hr": 68,
+      "spo2": 94,
+      "temp": 36.6,
+      "systolic": 131,
+      "diastolic": 71,
+      "rr": 17,
+      "ecg": 0
+    },
+    "currentVitals": {
+      "hr": 68,
+      "spo2": 94,
+      "temp": 36.6,
+      "systolic": 131,
+      "diastolic": 71,
+      "rr": 17,
+      "ecg": 0
+    },
+    "derived": {
+      "shockIndex": 0.52,
+      "map": 91.0,
+      "pulsePressure": 60
+    },
+    "riskScore": 8,
+    "riskLevel": "stable",
+    "factors": []
+  }
+]
