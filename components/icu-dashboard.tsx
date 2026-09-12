@@ -1,23 +1,21 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Activity,
   Bell,
   BrainCircuit,
+  ChevronLeft,
   ChevronRight,
-  CircleUserRound,
   CloudUpload,
   Droplets,
   HeartPulse,
-  LayoutDashboard,
-  Menu,
   Radio,
+  RotateCcw,
   Settings2,
   ShieldCheck,
   Sparkles,
-  Stethoscope,
   Thermometer,
+  Users,
   Waves,
   Wind,
   X,
@@ -38,32 +36,27 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CardSpotlight } from '@/components/ui/card-spotlight';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import { PatientSidebar } from '@/components/patient-sidebar/patient-sidebar';
+import {
+  Model,
+  PatientRecord,
+  Scenario,
+  Vitals,
+} from '@/lib/patient-types';
+import {
+  calculateSensorFusion,
+  computeRiskFactors,
+  computeRiskScore,
+  parseKaggleCsv,
+  parseSinglePatientText,
+} from '@/lib/patient-parser';
+import demoCohortData from '@/public/data/demo-cohort.json';
 
-type Model = 'fusion' | 'baseline';
-type Scenario = 'custom' | 'stable' | 'sepsis' | 'hypoxia' | 'shock';
-
-type Vitals = {
-  hr: number;
-  spo2: number;
-  temp: number;
-  systolic: number;
-  diastolic: number;
-  rr: number;
-  ecg: number;
-};
-
-type Patient = {
-  name: string;
-  id: string;
-  age: string;
-  unit: string;
-  bed: string;
-  admitted: string;
-  fileName: string;
-};
+const initialDemoCohort = demoCohortData as PatientRecord[];
 
 const scenarios: Record<Scenario, { label: string; values: Vitals }> = {
   custom: {
@@ -127,27 +120,6 @@ const scenarios: Record<Scenario, { label: string; values: Vitals }> = {
     },
   },
 };
-
-const navItems = [
-  { label: 'Monitor', icon: LayoutDashboard, active: true },
-  { label: 'Patients', icon: Stethoscope },
-  { label: 'Analytics', icon: Activity },
-  { label: 'Alerts', icon: Bell },
-];
-
-function riskFromVitals(v: Vitals, model: Model) {
-  const shockIndex = v.hr / v.systolic;
-  const map = (2 * v.diastolic + v.systolic) / 3;
-  let score = model === 'fusion' ? 8 : 12;
-
-  score += Math.max(0, 94 - v.spo2) * (model === 'fusion' ? 5.2 : 3.6);
-  score += Math.max(0, shockIndex - 0.72) * (model === 'fusion' ? 72 : 46);
-  score += Math.max(0, 70 - map) * (model === 'fusion' ? 1.25 : 0.7);
-  score += Math.max(0, v.temp - 37.5) * (model === 'fusion' ? 8 : 5);
-  score += Math.max(0, v.rr - 20) * (model === 'fusion' ? 2.6 : 1.7);
-  score += v.ecg * (model === 'fusion' ? 10 : 7);
-  return Math.max(2, Math.min(98, Math.round(score)));
-}
 
 function VitalCard({
   label,
@@ -286,89 +258,133 @@ function ControlSlider({
   );
 }
 
-function parsePatientText(text: string, fileName: string) {
-  const entries = new Map<string, string>();
-
-  for (const line of text.split(/\r?\n/)) {
-    const match = line.match(/^\s*([^:=]+?)\s*[:=]\s*(.+?)\s*$/);
-    if (!match) continue;
-    const key = match[1]
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, ' ')
-      .trim();
-    entries.set(key, match[2].trim());
-  }
-
-  const get = (...aliases: string[]) => {
-    for (const alias of aliases) {
-      const value = entries.get(alias);
-      if (value) return value;
+function getInitialPatient(): PatientRecord | null {
+  if (typeof window !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    const targetId = params.get('patient');
+    if (targetId) {
+      const target = initialDemoCohort.find((p) => p.id === targetId);
+      if (target) return target;
     }
-    return undefined;
-  };
-  const number = (fallback: number, ...aliases: string[]) => {
-    const raw = get(...aliases);
-    if (!raw) return fallback;
-    const value = Number.parseFloat(raw.replace(/[^0-9.-]/g, ''));
-    return Number.isFinite(value) ? value : fallback;
-  };
-  const rhythm = get('ecg arrhythmia', 'arrhythmia', 'ecg rhythm', 'ecg');
-  const systolic = number(
-    120,
-    'systolic bp',
-    'systolic blood pressure',
-    'systolic',
-    'sbp',
+  }
+  return (
+    initialDemoCohort.find((p) => p.riskLevel === 'critical') ||
+    initialDemoCohort[0] ||
+    null
   );
-  const diastolic = number(
-    Math.round(systolic * 0.65),
-    'diastolic bp',
-    'diastolic blood pressure',
-    'diastolic',
-    'dbp',
-  );
-
-  return {
-    patient: {
-      name:
-        get('patient name', 'name', 'patient') ??
-        fileName.replace(/\.txt$/i, ''),
-      id: get('patient id', 'record id', 'ehr', 'id') ?? 'Not provided',
-      age: get('age', 'patient age') ?? 'Not provided',
-      unit: get('unit', 'ward', 'icu') ?? 'ICU',
-      bed: get('bed', 'bed number') ?? '—',
-      admitted:
-        get('admitted', 'admission date', 'date admitted') ?? 'Not provided',
-      fileName,
-    } satisfies Patient,
-    vitals: {
-      hr: number(75, 'heart rate', 'heart rate bpm', 'hr', 'pulse'),
-      spo2: number(98, 'spo2', 'oxygen saturation', 'oxygen level'),
-      temp: number(36.8, 'temperature', 'body temperature', 'temp'),
-      systolic,
-      diastolic,
-      rr: number(16, 'respiratory rate', 'respiration rate', 'rr'),
-      ecg:
-        rhythm && /arrhythm|abnormal|detected|yes|true|\b1\b/i.test(rhythm)
-          ? 1
-          : 0,
-    } satisfies Vitals,
-  };
 }
 
 export function IcuDashboard() {
   const [model, setModel] = useState<Model>('fusion');
   const [scenario, setScenario] = useState<Scenario>('custom');
-  const [vitals, setVitals] = useState<Vitals>(scenarios.custom.values);
-  const [patient, setPatient] = useState<Patient | null>(null);
+  const [cohort, setCohort] = useState<PatientRecord[]>(() => initialDemoCohort);
+  const [selectedPatient, setSelectedPatient] = useState<PatientRecord | null>(
+    () => getInitialPatient(),
+  );
+  const [vitals, setVitals] = useState<Vitals>(
+    () => getInitialPatient()?.currentVitals || scenarios.custom.values,
+  );
   const [controlsOpen, setControlsOpen] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isLoadingCohort, setIsLoadingCohort] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState(() =>
+    typeof window !== 'undefined' ? navigator.onLine : true,
+  );
 
+  // Online / Offline monitor
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Synchronize active patient selection with URL query parameter
+  const selectPatient = useCallback(
+    (p: PatientRecord) => {
+      setSelectedPatient(p);
+      setVitals(p.currentVitals);
+      setScenario('custom');
+      if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href);
+        url.searchParams.set('patient', p.id);
+        window.history.replaceState(null, '', url.toString());
+      }
+    },
+    [],
+  );
+
+  // Load demo cohort (from /data/demo-cohort.json or fallback)
+  const loadDemoCohort = useCallback(async () => {
+    setIsLoadingCohort(true);
+    try {
+      const res = await fetch('/data/demo-cohort.json');
+      if (res.ok) {
+        const data = (await res.json()) as PatientRecord[];
+        setCohort(data);
+        const params = new URLSearchParams(window.location.search);
+        const targetId = params.get('patient');
+        const initial =
+          data.find((item) => item.id === targetId) ||
+          data.find((item) => item.riskLevel === 'critical') ||
+          data[0];
+        if (initial) {
+          selectPatient(initial);
+        }
+      } else {
+        setCohort(initialDemoCohort);
+        if (initialDemoCohort[0]) selectPatient(initialDemoCohort[0]);
+      }
+    } catch (err) {
+      console.error('Failed to load demo cohort:', err);
+      setCohort(initialDemoCohort);
+      if (initialDemoCohort[0]) selectPatient(initialDemoCohort[0]);
+    } finally {
+      setIsLoadingCohort(false);
+    }
+  }, [selectPatient]);
+
+  // Read URL params and verify fresh background fetch without blocking UI
+  useEffect(() => {
+    let active = true;
+
+    fetch('/data/demo-cohort.json')
+      .then((res) => (res.ok ? (res.json() as Promise<PatientRecord[]>) : null))
+      .then((data) => {
+        if (!active || !data || data.length === 0) return;
+        setCohort(data);
+        if (typeof window !== 'undefined') {
+          const params = new URLSearchParams(window.location.search);
+          const targetId = params.get('patient');
+          const initial =
+            data.find((item) => item.id === targetId) ||
+            data.find((item) => item.riskLevel === 'critical') ||
+            data[0];
+          if (initial) {
+            selectPatient(initial);
+          }
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
+  }, [selectPatient]);
+
+  // Derived sensor-fusion calculations
   const dbp = vitals.diastolic;
   const shockIndex = vitals.hr / vitals.systolic;
   const map = (2 * dbp + vitals.systolic) / 3;
   const pulsePressure = vitals.systolic - dbp;
-  const risk = riskFromVitals(vitals, model);
+  const risk = computeRiskScore(vitals, model);
   const state = risk >= 70 ? 'critical' : risk >= 30 ? 'moderate' : 'stable';
   const stateLabel =
     state === 'critical'
@@ -377,14 +393,10 @@ export function IcuDashboard() {
         ? 'Early warning'
         : 'Patient stable';
 
-  const factors = [
-    shockIndex > 0.9 && `Elevated Shock Index (${shockIndex.toFixed(2)})`,
-    map < 65 && `Low MAP (${map.toFixed(0)} mmHg)`,
-    vitals.spo2 < 90 && `Hypoxemia (${vitals.spo2}% SpO₂)`,
-    vitals.temp > 38.3 && `High temperature (${vitals.temp.toFixed(1)}°C)`,
-    vitals.rr > 24 && `Rapid respiration (${vitals.rr}/min)`,
-    vitals.ecg === 1 && 'Arrhythmia detected',
-  ].filter(Boolean) as string[];
+  const factors = computeRiskFactors(
+    vitals,
+    calculateSensorFusion(vitals),
+  );
 
   const chartData = useMemo(
     () =>
@@ -404,19 +416,194 @@ export function IcuDashboard() {
     [vitals.hr, vitals.spo2],
   );
 
+  // Update vital signs from what-if sliders and sync with active patient
   const updateVital = (key: keyof Vitals, value: number) => {
     setScenario('custom');
-    setVitals((current) => ({
-      ...current,
+    const nextVitals: Vitals = {
+      ...vitals,
       [key]: value,
       ...(key === 'systolic' ? { diastolic: Math.round(value * 0.65) } : {}),
-    }));
+    };
+    setVitals(nextVitals);
+
+    if (selectedPatient) {
+      const derived = calculateSensorFusion(nextVitals);
+      const riskScore = computeRiskScore(nextVitals, model);
+      const riskLevel =
+        riskScore >= 70 ? 'critical' : riskScore >= 30 ? 'moderate' : 'stable';
+      const newFactors = computeRiskFactors(nextVitals, derived);
+
+      const updated: PatientRecord = {
+        ...selectedPatient,
+        currentVitals: nextVitals,
+        derived,
+        riskScore,
+        riskLevel,
+        factors: newFactors,
+        isModified: true,
+      };
+
+      setSelectedPatient(updated);
+      setCohort((prev) =>
+        prev.map((item) => (item.id === updated.id ? updated : item)),
+      );
+    }
   };
 
   const chooseScenario = (next: Scenario) => {
     setScenario(next);
-    setVitals(scenarios[next].values);
+    const nextVitals = scenarios[next].values;
+    setVitals(nextVitals);
+
+    if (selectedPatient) {
+      const derived = calculateSensorFusion(nextVitals);
+      const riskScore = computeRiskScore(nextVitals, model);
+      const riskLevel =
+        riskScore >= 70 ? 'critical' : riskScore >= 30 ? 'moderate' : 'stable';
+      const newFactors = computeRiskFactors(nextVitals, derived);
+
+      const updated: PatientRecord = {
+        ...selectedPatient,
+        currentVitals: nextVitals,
+        derived,
+        riskScore,
+        riskLevel,
+        factors: newFactors,
+        isModified: next !== 'stable',
+      };
+
+      setSelectedPatient(updated);
+      setCohort((prev) =>
+        prev.map((item) => (item.id === updated.id ? updated : item)),
+      );
+    }
   };
+
+  // Reset current patient to admission baseline vitals
+  const resetPatientToBaseline = useCallback(() => {
+    if (!selectedPatient) return;
+    const baseline = selectedPatient.baselineVitals;
+    const derived = calculateSensorFusion(baseline);
+    const riskScore = computeRiskScore(baseline, model);
+    const riskLevel =
+      riskScore >= 70 ? 'critical' : riskScore >= 30 ? 'moderate' : 'stable';
+    const newFactors = computeRiskFactors(baseline, derived);
+
+    const updated: PatientRecord = {
+      ...selectedPatient,
+      currentVitals: { ...baseline },
+      derived,
+      riskScore,
+      riskLevel,
+      factors: newFactors,
+      isModified: false,
+    };
+
+    setSelectedPatient(updated);
+    setVitals({ ...baseline });
+    setScenario('custom');
+    setCohort((prev) =>
+      prev.map((item) => (item.id === updated.id ? updated : item)),
+    );
+  }, [selectedPatient, model]);
+
+  // Model selection handler that synchronizes scores across active view & roster
+  const handleModelChange = (nextModel: Model) => {
+    setModel(nextModel);
+    if (selectedPatient) {
+      const derived = calculateSensorFusion(vitals);
+      const riskScore = computeRiskScore(vitals, nextModel);
+      const riskLevel =
+        riskScore >= 70 ? 'critical' : riskScore >= 30 ? 'moderate' : 'stable';
+      const newFactors = computeRiskFactors(vitals, derived);
+      setSelectedPatient((curr) =>
+        curr
+          ? {
+              ...curr,
+              riskScore,
+              riskLevel,
+              factors: newFactors,
+            }
+          : null,
+      );
+    }
+    setCohort((prev) =>
+      prev.map((p) => {
+        const derived = calculateSensorFusion(p.currentVitals);
+        const score = computeRiskScore(p.currentVitals, nextModel);
+        const level =
+          score >= 70 ? 'critical' : score >= 30 ? 'moderate' : 'stable';
+        const f = computeRiskFactors(p.currentVitals, derived);
+        return {
+          ...p,
+          riskScore: score,
+          riskLevel: level,
+          factors: f,
+        };
+      }),
+    );
+  };
+
+  // Previous & Next cycling
+  const cyclePatient = useCallback(
+    (direction: 'prev' | 'next') => {
+      if (cohort.length === 0) return;
+      const currentIndex = selectedPatient
+        ? cohort.findIndex((p) => p.id === selectedPatient.id)
+        : 0;
+      const nextIndex =
+        direction === 'next'
+          ? (currentIndex + 1) % cohort.length
+          : (currentIndex - 1 + cohort.length) % cohort.length;
+      selectPatient(cohort[nextIndex]);
+    },
+    [cohort, selectedPatient, selectPatient],
+  );
+
+  // Jump to next critical patient (Rapid triage jump)
+  const jumpToNextCritical = useCallback(() => {
+    if (cohort.length === 0) return;
+    const currentIndex = selectedPatient
+      ? cohort.findIndex((p) => p.id === selectedPatient.id)
+      : -1;
+    const criticalIndices = cohort
+      .map((p, idx) => ({ p, idx }))
+      .filter((x) => x.p.riskLevel === 'critical');
+
+    if (criticalIndices.length === 0) return;
+
+    const nextCritical =
+      criticalIndices.find((x) => x.idx > currentIndex) || criticalIndices[0];
+    selectPatient(nextCritical.p);
+  }, [cohort, selectedPatient, selectPatient]);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+      if (e.key === '[' || (e.altKey && e.key === 'ArrowUp')) {
+        e.preventDefault();
+        cyclePatient('prev');
+      } else if (e.key === ']' || (e.altKey && e.key === 'ArrowDown')) {
+        e.preventDefault();
+        cyclePatient('next');
+      } else if (e.altKey && (e.key === 'c' || e.key === 'C')) {
+        e.preventDefault();
+        jumpToNextCritical();
+      } else if ((e.metaKey || e.ctrlKey) && (e.key === 'b' || e.key === 'B')) {
+        e.preventDefault();
+        setIsSidebarCollapsed((prev) => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [cyclePatient, jumpToNextCritical]);
 
   const comparison: Array<[string, number, number]> = [
     ['Accuracy', 92.2, 99.8],
@@ -425,15 +612,29 @@ export function IcuDashboard() {
     ['ROC-AUC', 96.78, 99.99],
   ];
 
+  // Ingest Kaggle CSV or plain-text record
   const handlePatientFile = async (file: File) => {
-    const parsed = parsePatientText(await file.text(), file.name);
-    setPatient(parsed.patient);
-    setVitals(parsed.vitals);
-    setScenario('custom');
-    setFileName(file.name);
+    const text = await file.text();
+    if (file.name.toLowerCase().endsWith('.csv')) {
+      const records = parseKaggleCsv(text, file.name);
+      if (records.length > 0) {
+        setCohort(records);
+        selectPatient(records[0]);
+        setFileName(file.name);
+      }
+    } else {
+      const record = parseSinglePatientText(text, file.name);
+      setCohort((prev) => [
+        record,
+        ...prev.filter((p) => p.id !== record.id),
+      ]);
+      selectPatient(record);
+      setFileName(file.name);
+    }
   };
 
-  if (!patient) {
+  // Full-page empty state when cohort is completely empty
+  if (!selectedPatient && cohort.length === 0) {
     return (
       <main className="empty-state relative grid min-h-screen place-items-center overflow-hidden bg-[#f6f8fd] px-4 py-20 text-slate-900">
         <div className="ambient ambient-pink" />
@@ -461,37 +662,39 @@ export function IcuDashboard() {
               <Sparkles /> Patient workspace
             </Badge>
             <h1 className="max-w-md text-3xl font-semibold tracking-[-0.055em] text-slate-900 md:text-[2.6rem] md:leading-[1.08]">
-              Start with a patient medical record.
+              ICU Deterioration Intelligence.
             </h1>
             <p className="mt-4 max-w-md text-[15px] leading-6 text-slate-500">
-              Drop a plain-text record to populate identity, vitals,
-              sensor-fusion indicators, and the deterioration risk dashboard.
+              Load a multi-patient Kaggle dataset, drop a plain-text medical record,
+              or explore the pre-trained ICU demo cohort.
             </p>
+
+            <div className="mt-6 flex flex-wrap gap-2">
+              <Button
+                onClick={() => void loadDemoCohort()}
+                className="spectral-button rounded-xl text-white shadow-md shadow-pink-200/50"
+              >
+                <Sparkles className="size-4" /> Load Kaggle Demo Cohort
+              </Button>
+            </div>
+
             <div className="mt-7 rounded-2xl border border-white/80 bg-white/56 p-4 font-mono text-[11px] leading-5 text-slate-500">
               <div className="mb-2 font-sans text-xs font-semibold text-slate-700">
-                Accepted format
+                Supported formats
               </div>
-              <div>Patient Name: Aarav Rao</div>
-              <div>Patient ID: EHR-9041</div>
-              <div>Age: 54</div>
-              <div>Heart Rate: 82</div>
-              <div>SpO2: 96</div>
-              <div>Temperature: 37.1</div>
-              <div>Systolic BP: 112</div>
-              <div>Diastolic BP: 73</div>
-              <div>Respiratory Rate: 18</div>
+              <div>• Kaggle CSV: icu_patient_dataset.csv</div>
+              <div>• Patient TXT: Key-value clinical note</div>
             </div>
           </div>
 
           <div className="rounded-[24px] border border-white/90 bg-white/68 p-4 shadow-[inset_0_1px_0_white,0_16px_38px_rgba(68,82,122,.07)]">
             <div className="mb-3 flex items-center gap-2 px-1 text-sm font-semibold text-slate-700">
-              <CloudUpload className="size-4 text-cyan-500" /> Upload medical
-              information
+              <CloudUpload className="size-4 text-cyan-500" /> Upload medical records
             </div>
             <FileUpload
               className="patient-upload empty-upload max-w-none"
-              acceptedFileTypes={['text/plain']}
-              maxFileSize={2 * 1024 * 1024}
+              acceptedFileTypes={['text/plain', 'text/csv', '.csv', '.txt']}
+              maxFileSize={10 * 1024 * 1024}
               uploadDelay={500}
               onUploadSuccess={(file) => void handlePatientFile(file)}
             />
@@ -503,65 +706,87 @@ export function IcuDashboard() {
         </section>
 
         <p className="absolute bottom-5 text-center text-[11px] text-slate-400">
-          Proof of concept · Not clinically validated
+          Proof of concept · Kaggle synthetic ICU evaluation · Not clinically validated
         </p>
       </main>
     );
   }
+
+  const currentPatientIndex = selectedPatient
+    ? cohort.findIndex((p) => p.id === selectedPatient.id)
+    : 0;
 
   return (
     <main className="min-h-screen bg-[#f6f8fd] text-slate-900">
       <div className="ambient ambient-pink" />
       <div className="ambient ambient-blue" />
 
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[76px] flex-col items-center border-r border-white/70 bg-white/58 py-5 backdrop-blur-2xl lg:flex">
-        <div className="brand-orb mb-8 grid size-10 place-items-center rounded-[14px] text-white shadow-lg shadow-pink-200/50">
-          <HeartPulse className="size-5" />
-        </div>
-        <nav
-          className="flex flex-1 flex-col gap-2"
-          aria-label="Main navigation"
-        >
-          {navItems.map(({ label, icon: Icon, active }) => (
-            <button
-              key={label}
-              type="button"
-              aria-label={label}
-              className={cn(
-                'nav-button group relative grid size-11 place-items-center rounded-[14px] text-slate-400 transition',
-                active && 'active text-slate-900',
-              )}
-            >
-              <Icon className="size-[18px]" />
-              <span className="pointer-events-none absolute left-14 z-50 rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs text-white opacity-0 shadow-lg transition group-hover:opacity-100">
-                {label}
-              </span>
-            </button>
-          ))}
-        </nav>
-        <button
-          type="button"
-          aria-label="Settings"
-          className="nav-button grid size-11 place-items-center rounded-[14px] text-slate-400"
-        >
-          <Settings2 className="size-[18px]" />
-        </button>
-        <div className="mt-4 grid size-10 place-items-center rounded-full bg-gradient-to-br from-pink-100 to-blue-100 text-slate-600">
-          <CircleUserRound className="size-5" />
-        </div>
-      </aside>
+      {/* Desktop SaaS Left Sidebar */}
+      <div className="fixed inset-y-0 left-0 z-40 hidden lg:block">
+        <PatientSidebar
+          cohort={cohort}
+          selectedPatient={selectedPatient}
+          onSelectPatient={selectPatient}
+          onCyclePatient={cyclePatient}
+          onJumpCritical={jumpToNextCritical}
+          isLoading={isLoadingCohort}
+          onFileUpload={handlePatientFile}
+          onLoadDemoCohort={loadDemoCohort}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
+        />
+      </div>
 
-      <div className="relative lg:pl-[76px]">
+      {/* Mobile Off-canvas Sidebar Sheet */}
+      <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
+        <SheetContent
+          side="left"
+          showCloseButton={false}
+          className="w-[320px] max-w-[85vw] p-0 border-0 bg-transparent shadow-2xl"
+        >
+          <PatientSidebar
+            cohort={cohort}
+            selectedPatient={selectedPatient}
+            onSelectPatient={(p) => {
+              selectPatient(p);
+              setMobileSidebarOpen(false);
+            }}
+            onCyclePatient={cyclePatient}
+            onJumpCritical={jumpToNextCritical}
+            isLoading={isLoadingCohort}
+            onFileUpload={(file) => {
+              void handlePatientFile(file);
+              setMobileSidebarOpen(false);
+            }}
+            onLoadDemoCohort={loadDemoCohort}
+            isCollapsed={false}
+          />
+        </SheetContent>
+      </Sheet>
+
+      {/* Main Fluid Bedside View */}
+      <div
+        className={cn(
+          'relative transition-[padding] duration-300',
+          isSidebarCollapsed
+            ? 'lg:pl-[72px]'
+            : 'lg:pl-[310px] xl:pl-[330px]',
+        )}
+      >
+        {/* Sticky Top Header */}
         <header className="sticky top-0 z-30 flex min-h-[72px] items-center justify-between border-b border-white/70 bg-[#f8faff]/72 px-4 backdrop-blur-2xl md:px-7">
           <div className="flex items-center gap-3">
+            {/* Mobile Roster Sheet Toggle Button */}
             <Button
               variant="ghost"
               size="icon"
               className="lg:hidden"
-              onClick={() => setControlsOpen(true)}
+              onClick={() => setMobileSidebarOpen(true)}
+              aria-label="Open patient roster"
             >
-              <Menu />
+              <Users className="size-4" />
             </Button>
+
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg font-semibold tracking-[-0.03em]">
@@ -579,15 +804,64 @@ export function IcuDashboard() {
               </p>
             </div>
           </div>
+
           <div className="flex items-center gap-2 md:gap-4">
-            <div className="hidden items-center gap-2 rounded-full border border-emerald-200/60 bg-emerald-50/70 px-3 py-1.5 text-xs font-medium text-emerald-700 sm:flex">
-              <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />{' '}
-              Sensor hub online
-            </div>
+            {/* Online / Sensor Hub Status Pill */}
+            {isOnline ? (
+              <div className="hidden items-center gap-2 rounded-full border border-emerald-200/60 bg-emerald-50/70 px-3 py-1.5 text-xs font-medium text-emerald-700 sm:flex">
+                <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
+                Sensor hub online
+              </div>
+            ) : (
+              <div className="hidden items-center gap-2 rounded-full border border-amber-200/60 bg-amber-50/70 px-3 py-1.5 text-xs font-medium text-amber-700 sm:flex">
+                <span className="size-1.5 rounded-full bg-amber-500" />
+                Offline · Local cohort
+              </div>
+            )}
+
+            {/* Quick Header Patient Cycler (convenient on smaller screens) */}
+            {cohort.length > 1 && (
+              <div className="flex items-center rounded-xl border border-white bg-white/70 p-0.5">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => cyclePatient('prev')}
+                  className="size-7 rounded-lg text-slate-500 hover:text-slate-900"
+                  title="Previous patient ( [ )"
+                >
+                  <ChevronLeft className="size-3.5" />
+                </Button>
+                <span className="px-2 font-mono text-xs font-medium text-slate-600">
+                  {currentPatientIndex + 1}/{cohort.length}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => cyclePatient('next')}
+                  className="size-7 rounded-lg text-slate-500 hover:text-slate-900"
+                  title="Next patient ( ] )"
+                >
+                  <ChevronRight className="size-3.5" />
+                </Button>
+              </div>
+            )}
+
+            {/* Simulation controls toggle */}
+            <Button
+              variant="outline"
+              size="icon"
+              className="rounded-xl border-white bg-white/70 lg:hidden"
+              onClick={() => setControlsOpen(true)}
+              title="Simulation controls"
+            >
+              <Settings2 className="size-4" />
+            </Button>
+
             <Button
               variant="outline"
               size="icon"
               className="relative rounded-xl border-white bg-white/70"
+              aria-label="Alerts"
             >
               <Bell className="size-4" />
               <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-pink-500" />
@@ -595,63 +869,87 @@ export function IcuDashboard() {
           </div>
         </header>
 
+        {/* Main Content Area */}
         <div className="mx-auto max-w-[1600px] px-4 py-5 md:px-7 md:py-6">
-          <section className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-center">
-            <div className="flex items-center gap-3">
-              <div className="grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-blue-100 to-pink-100 font-mono text-sm font-bold text-slate-700">
-                {patient.name
-                  .split(/\s+/)
-                  .slice(0, 2)
-                  .map((part) => part[0])
-                  .join('')
-                  .toUpperCase()}
-              </div>
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="font-semibold tracking-tight">
-                    {patient.name}
-                  </h2>
-                  <span className="text-xs text-slate-400">
-                    {patient.unit}
-                    {patient.bed === '—'
-                      ? ' · Bed not provided'
-                      : ` · Bed ${patient.bed}`}
-                  </span>
+          {/* Patient Overview Card */}
+          {selectedPatient && (
+            <section className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-center">
+              <div className="flex items-center gap-3">
+                <div className="grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-blue-100 to-pink-100 font-mono text-sm font-bold text-slate-700 shadow-sm">
+                  {selectedPatient.name
+                    .split(/\s+/)
+                    .slice(0, 2)
+                    .map((part) => part[0])
+                    .join('')
+                    .toUpperCase()}
                 </div>
-                <p className="mt-0.5 text-xs text-slate-400">
-                  {patient.id} · {patient.age} years · Admitted{' '}
-                  {patient.admitted}
-                </p>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="font-semibold tracking-tight text-slate-900">
+                      {selectedPatient.name}
+                    </h2>
+                    <span className="text-xs text-slate-400">
+                      {selectedPatient.unit} · {selectedPatient.bed}
+                    </span>
+                    {selectedPatient.isModified && (
+                      <div className="flex items-center gap-1.5">
+                        <Badge
+                          variant="outline"
+                          className="border-violet-200 bg-violet-50 text-[10px] text-violet-700"
+                        >
+                          What-if modified
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={resetPatientToBaseline}
+                          className="h-5 rounded-md px-1.5 text-[10px] font-medium text-violet-700 hover:bg-violet-100 hover:text-violet-900"
+                          title="Reset this patient to admission baseline vitals"
+                        >
+                          <RotateCcw className="mr-1 size-2.5" />
+                          Reset
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-xs text-slate-400">
+                    {selectedPatient.id} · {selectedPatient.age} years · Admitted{' '}
+                    {selectedPatient.admitted}
+                  </p>
+                </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge
-                variant="outline"
-                className="h-7 border-white bg-white/70 px-2.5 text-slate-500"
-              >
-                <Radio className="text-cyan-500" /> Updated now
-              </Badge>
-              <Button
-                variant="outline"
-                className="h-8 rounded-xl border-white bg-white/70 px-3 text-xs"
-                onClick={() => setControlsOpen(true)}
-              >
-                <Settings2 /> Simulation controls
-              </Button>
-              <Button
-                variant="ghost"
-                className="h-8 rounded-xl px-3 text-xs text-slate-500"
-                onClick={() => {
-                  setPatient(null);
-                  setFileName(null);
-                  setControlsOpen(false);
-                }}
-              >
-                Unload record
-              </Button>
-            </div>
-          </section>
 
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge
+                  variant="outline"
+                  className="h-7 border-white bg-white/70 px-2.5 text-slate-500"
+                >
+                  <Radio className="text-cyan-500 size-3 mr-1" /> Live Bedside
+                </Badge>
+                <Button
+                  variant="outline"
+                  className="h-8 rounded-xl border-white bg-white/70 px-3 text-xs"
+                  onClick={() => setControlsOpen(true)}
+                >
+                  <Settings2 className="size-3.5 mr-1" /> Simulation controls
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="h-8 rounded-xl px-3 text-xs text-slate-500 hover:bg-white/60"
+                  onClick={() => {
+                    setCohort([]);
+                    setSelectedPatient(null);
+                    setFileName(null);
+                    setControlsOpen(false);
+                  }}
+                >
+                  Unload all
+                </Button>
+              </div>
+            </section>
+          )}
+
+          {/* Vitals Summary Grid */}
           <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
             <VitalCard
               label="Heart rate"
@@ -691,6 +989,7 @@ export function IcuDashboard() {
             />
           </section>
 
+          {/* Mid Section: Bedside Waveform & AI Deterioration Gauge */}
           <section className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.75fr)_minmax(340px,.75fr)]">
             <Card className="glass-panel gap-0 border-0 py-0">
               <CardHeader className="flex flex-row items-center justify-between px-5 pb-0 pt-5">
@@ -891,6 +1190,7 @@ export function IcuDashboard() {
             </CardSpotlight>
           </section>
 
+          {/* Derived Indicators */}
           <section className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <MetricPill
               label="Shock Index"
@@ -913,6 +1213,7 @@ export function IcuDashboard() {
             />
           </section>
 
+          {/* Bottom Section: Performance Benchmark & Record Ingestion */}
           <section className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(420px,.7fr)]">
             <Card className="glass-panel border-0 py-0">
               <CardHeader className="border-b border-slate-100/70 px-5 py-4">
@@ -927,14 +1228,14 @@ export function IcuDashboard() {
                   </div>
                   <Tabs
                     value={model}
-                    onValueChange={(value) => setModel(value as Model)}
+                    onValueChange={(value) => handleModelChange(value as Model)}
                   >
                     <TabsList className="h-9 rounded-xl bg-slate-100/80 p-1">
                       <TabsTrigger
                         value="fusion"
                         className="rounded-lg px-3 text-xs data-active:bg-white data-active:shadow-sm"
                       >
-                        <Sparkles /> Sensor fusion
+                        <Sparkles className="size-3 mr-1" /> Sensor fusion
                       </TabsTrigger>
                       <TabsTrigger
                         value="baseline"
@@ -996,24 +1297,24 @@ export function IcuDashboard() {
             <Card className="glass-panel border-0 py-0">
               <CardHeader className="px-5 pb-2 pt-4">
                 <CardTitle className="flex items-center gap-2 text-[15px]">
-                  <CloudUpload className="size-4 text-cyan-500" /> Loaded
-                  patient record
+                  <CloudUpload className="size-4 text-cyan-500" /> Ingest patient
+                  records
                 </CardTitle>
                 <p className="text-xs text-slate-400">
-                  Replace the current record with another TXT file
+                  Upload multi-patient Kaggle CSV or individual TXT charts
                 </p>
               </CardHeader>
               <CardContent className="px-5 pb-5">
                 <FileUpload
                   className="patient-upload max-w-none"
-                  acceptedFileTypes={['text/plain']}
-                  maxFileSize={2 * 1024 * 1024}
-                  uploadDelay={650}
+                  acceptedFileTypes={['text/plain', 'text/csv', '.csv', '.txt']}
+                  maxFileSize={10 * 1024 * 1024}
+                  uploadDelay={400}
                   onUploadSuccess={(file) => void handlePatientFile(file)}
                 />
                 {fileName && (
                   <div className="mt-3 flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
-                    <ShieldCheck className="size-4" /> {fileName} is active
+                    <ShieldCheck className="size-4" /> {fileName} active in roster
                   </div>
                 )}
               </CardContent>
@@ -1022,6 +1323,7 @@ export function IcuDashboard() {
         </div>
       </div>
 
+      {/* Right Drawer: Simulation Controls */}
       <div
         className={cn(
           'fixed inset-0 z-50 transition',
@@ -1053,13 +1355,28 @@ export function IcuDashboard() {
                 Explore how vital changes affect risk
               </p>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setControlsOpen(false)}
-            >
-              <X />
-            </Button>
+            <div className="flex items-center gap-1.5">
+              {selectedPatient?.isModified && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={resetPatientToBaseline}
+                  className="h-8 rounded-xl border-violet-200 bg-violet-50/80 px-2.5 text-xs font-medium text-violet-700 hover:bg-violet-100"
+                  title="Reset active patient to baseline vitals"
+                >
+                  <RotateCcw className="mr-1 size-3" />
+                  Reset vitals
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setControlsOpen(false)}
+                aria-label="Close controls"
+              >
+                <X />
+              </Button>
+            </div>
           </div>
           <div className="mb-6">
             <div className="mb-3 text-xs font-semibold uppercase tracking-[.12em] text-slate-400">

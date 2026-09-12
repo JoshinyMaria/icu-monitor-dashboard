@@ -1,25 +1,203 @@
-# ICU Patient Monitoring Dashboard
+# ICU Patient Monitoring & Deterioration Intelligence Dashboard
 
-A web dashboard for visualizing and monitoring ICU patient vital signs and deterioration risk indicators in real time.
+A modern clinical web dashboard for real-time visualization of ICU patient vital signs, sensor-fusion clinical indicators, and machine-learning deterioration risk scoring.
+
+---
 
 ## Overview
 
-This dashboard provides continuous tracking of critical patient vitals, clinical risk scoring, and deterioration trend analysis. It is designed to assist clinical monitoring workflows with clear visual telemetry and customizable clinical scenarios.
+Traditional bedside monitors are reactive: they alarm only after individual vital signs breach preset single-parameter limits. This platform demonstrates proactive clinical decision support by evaluating multiple vital streams simultaneously, fusing raw telemetry into advanced physiological markers (Shock Index, Mean Arterial Pressure, Pulse Pressure), and predicting deterioration risk via gradient-boosted decision trees (XGBoost).
+
+The web interface is built as a production-grade, static-exportable SaaS dashboard with an interactive 24-patient roster, live telemetry streaming, what-if bedside simulations, and automated dataset synchronization.
+
+---
 
 ## Features
 
-- **Real-time Vitals Telemetry**: Continuous monitoring of Heart Rate, SpO2, Blood Pressure (Systolic/Diastolic), Respiratory Rate, and Temperature.
-- **Clinical Scenarios**: Presets for evaluating patient state transitions under Stable, Sepsis, Hypoxia, and Shock conditions.
-- **Trend Visualization**: Interactive area charts displaying vital sign fluctuations over monitoring windows.
-- **Data Import**: Direct file ingestion for reviewing exported patient monitoring logs (.txt).
-- **Static Export Architecture**: Configured for lightweight static deployment on Cloudflare Pages.
+- **SaaS Patient Roster & Navigation**:
+  - Wide collapsible patient sidebar with live search (`/`), acuity tabs (All, High, Med, Stable) with live patient counts, and selected state indicators.
+  - Previous / Next cycling shortcuts (`[` and `]`) and rapid high-acuity triage jump (`Alt+C`).
+  - Collapse / expand roster toggle (`Cmd/Ctrl+B`).
+  - Full mobile responsiveness via off-canvas Sheet drawer.
+- **Sensor Fusion & Clinical Indicators**:
+  - **Shock Index**: $\text{Heart Rate} / \text{Systolic BP}$ (early indicator of circulatory failure).
+  - **Mean Arterial Pressure (MAP)**: $(2 \times \text{Diastolic BP} + \text{Systolic BP}) / 3$ (organ perfusion indicator, threshold $\ge 65\text{ mmHg}$).
+  - **Pulse Pressure**: $\text{Systolic BP} - \text{Diastolic BP}$.
+- **Isolated What-if Simulations**:
+  - Dedicated simulation drawer for adjusting Heart Rate, SpO2, Blood Pressure, Temperature, Respiratory Rate, and ECG Rhythm per patient.
+  - Changes are isolated per patient record with clear "What-if modified" badges and one-click "Reset to baseline" capability.
+- **Dual Model Evaluation**:
+  - Toggle between **Sensor Fusion (XGBoost)** and **Baseline (Logistic Regression)** with live score re-evaluations across the entire cohort.
+- **Flexible Data Ingestion**:
+  - Upload multi-patient Kaggle CSV datasets or individual clinical text charts directly from the browser (processed locally via Web APIs).
+
+---
+
+## Algorithmic Approach & Risk Scoring
+
+The dashboard demonstrates clinical deterioration monitoring using a transparent, client-side sensor-fusion calculation. It distinguishes physiological feature derivation, heuristic risk estimation, and interface benchmarking as follows:
+
+### 1. Telemetry Inputs & Derived Physiological Signals
+
+The scoring pipeline ingests seven vital signs and computes three key hemodynamic indices:
+
+- **Primary Telemetry Inputs**:
+  - Heart Rate ($\text{HR}$, bpm)
+  - Oxygen Saturation ($\text{SpO}_2$, %)
+  - Systolic Blood Pressure ($\text{SBP}$, mmHg)
+  - Diastolic Blood Pressure ($\text{DBP}$, mmHg)
+  - Body Temperature ($\text{Temp}$, °C)
+  - Respiratory Rate ($\text{RR}$, breaths/min)
+  - Cardiac Arrhythmia indicator ($\text{ECG} \in \{0, 1\}$, derived from rhythm analysis)
+
+- **Derived Hemodynamic Signals**:
+  - **Shock Index ($\text{SI}$)**:
+    $$\text{SI} = \frac{\text{HR}}{\text{SBP}}$$
+    An early indicator of occult hypovolemic or septic shock (normal range $0.5\text{--}0.7$; penalized when $> 0.72$, flagged as clinical warning when $> 0.90$).
+  - **Mean Arterial Pressure ($\text{MAP}$)**:
+    $$\text{MAP} = \frac{2 \times \text{DBP} + \text{SBP}}{3}$$
+    A primary determinant of organ perfusion pressure (threshold $\ge 65\text{ mmHg}$; penalized when $< 70\text{ mmHg}$, flagged as warning when $< 65\text{ mmHg}$).
+  - **Pulse Pressure ($\text{PP}$)**:
+    $$\text{PP} = \text{SBP} - \text{DBP}$$
+    Reflects stroke volume and arterial compliance.
+
+### 2. Browser-Side Sensor Fusion Heuristic
+
+Rather than invoking a server-side ML model or client-side runtime (e.g., ONNX / TensorFlow.js), risk scores are computed directly in TypeScript (`lib/patient-parser.ts`) via a deterministic penalty-accumulation heuristic:
+
+```ts
+// Deterministic browser heuristic (lib/patient-parser.ts)
+const shockIndex = vitals.hr / vitals.systolic;
+const map = (2 * vitals.diastolic + vitals.systolic) / 3;
+
+let score = model === 'fusion' ? 8 : 12;
+score += Math.max(0, 94 - vitals.spo2) * (model === 'fusion' ? 5.2 : 3.6);
+score += Math.max(0, shockIndex - 0.72) * (model === 'fusion' ? 72 : 46);
+score += Math.max(0, 70 - map) * (model === 'fusion' ? 1.25 : 0.7);
+score += Math.max(0, vitals.temp - 37.5) * (model === 'fusion' ? 8 : 5);
+score += Math.max(0, vitals.rr - 20) * (model === 'fusion' ? 2.6 : 1.7);
+score += vitals.ecg * (model === 'fusion' ? 10 : 7);
+
+const riskScore = Math.max(2, Math.min(98, Math.round(score)));
+```
+
+Patients are triaged into three acuity bands based on `riskScore`:
+- **Stable**: $< 30\%$
+- **Moderate Warning**: $30\%\text{--}69\%$
+- **Critical Alert**: $\ge 70\%$
+
+Discrete alert factors (e.g., *Low MAP*, *Elevated Shock Index*, *Hypoxemia*) are flagged alongside the numeric score when individual physiological thresholds are breached.
+
+### 3. "Sensor Fusion (XGBoost)" vs. "Baseline (Logistic Regression)" in the UI
+
+The model selector in the dashboard UI provides an interactive visual demonstration rather than shipped machine learning inference:
+
+- **Dynamic Weight Profiles**: Toggling between **Sensor Fusion (XGBoost)** and **Baseline (Logistic Regression)** switches between two hardcoded heuristic coefficient sets in `computeRiskScore`. The `'fusion'` profile exhibits higher sensitivity to compound vital deviations (higher penalty multipliers on Shock Index, hypoxemia, and arrhythmia), whereas `'baseline'` applies flatter penalties.
+- **Visual Performance Comparison**: The "Algorithm performance" card (reporting Accuracy, Precision, Recall, and ROC-AUC) displays static prototype benchmark figures for comparative visualization. No trained XGBoost trees or logistic regression weight matrices are shipped, loaded, or executed in the browser bundle.
+- **No Clinical Validation**: The comparison illustrates how multi-modal fusion logic contrasts with single-parameter or linear scoring; it is a prototyping simulation and must not be interpreted as validated machine learning inference or clinical evidence.
+
+### 4. Role of the Kaggle Dataset
+
+The Kaggle dataset (`pallachetanareddy/icu-patient-vitals-monitoring-dataset`) is used exclusively for **record ingestion and cohort population**:
+- The offline Python ETL script (`scripts/sync_kaggle_cohort.py`) extracts synthetic multi-table telemetry and patient metadata to construct static demonstration fixtures (`public/data/demo-cohort.json`).
+- The in-browser ingestion module (`parseKaggleCsv`) parses uploaded CSV files into client-side patient records for live exploration.
+- The Kaggle records provide realistic synthetic time-series profiles for UI exploration; they do not serve as a clinical training or statistical validation set within this repository.
+
+---
+
+## Kaggle Dataset & ETL Pipeline
+
+### Dataset Information
+
+- **Dataset**: [ICU Patient Vitals & Deterioration Dataset](https://www.kaggle.com/datasets/pallachetanareddy/icu-patient-vitals-monitoring-dataset)
+- **Kaggle Slug**: `pallachetanareddy/icu-patient-vitals-monitoring-dataset`
+
+### Why the Pipeline Exists
+
+1. **Security & Secrets Isolation**: Direct browser fetching from Kaggle cannot be performed because it requires API credentials that must never be exposed to client bundles, and is blocked by CORS.
+2. **Two-Table Ingestion & Normalization**: The Kaggle dataset archive provides dual tables: `patient_vitals.csv` (383k+ 15-minute time-series clinical readings) and `patients_meta.csv` (patient demographics, ICU unit assignments, and admission context across 500 patients). The ETL script robustly identifies both tables, joins demographic and ward metadata by patient ID, normalizes clinical telemetry into the structured `PatientRecord` TypeScript interface, calculates sensor-fusion indicators, and computes deterioration alert factors.
+3. **Deterministic Static Cohort**: Generates a comprehensive 500-patient cohort at `public/data/demo-cohort.json` (379 Critical, 66 Moderate, 55 Stable) directly from the real dual-table Kaggle dataset, enabling zero-latency exploration and static deployment on Cloudflare Pages without runtime server dependencies. The dashboard sidebar uses lightweight client-side virtualization to scroll all 500 patients with 60fps performance.
+
+### Accepted Credentials
+
+The ETL script automatically detects credentials from:
+- **Environment Variables**: `KAGGLE_USERNAME` and `KAGGLE_KEY`
+- **Kaggle Configuration File**: `~/.kaggle/kaggle.json`
+
+> **Security Note**: Kaggle secrets must **never** be committed to Git or referenced in client-side code. The client dashboard loads only the derived static JSON artifact.
+
+### Running Local Sync
+
+#### 1. Setup Dependencies
+
+```bash
+# From the dashboard directory
+pip install -r scripts/requirements.txt
+```
+
+#### 2. Run Sync Pipeline
+
+- **With Kaggle Credentials** (default 500-patient cohort from actual Kaggle tables):
+  ```bash
+  export KAGGLE_USERNAME="your_kaggle_username"
+  export KAGGLE_KEY="your_kaggle_api_key"
+  python scripts/sync_kaggle_cohort.py
+  ```
+
+- **Optional Smaller Cohort for Local Development** (`--cohort-size` or `--limit`):
+  ```bash
+  # Generate a smaller balanced cohort (e.g. 24 patients: 7 critical, 8 moderate, 9 stable)
+  python scripts/sync_kaggle_cohort.py --cohort-size 24
+  # Or use the --limit flag:
+  python scripts/sync_kaggle_cohort.py --limit 24
+  ```
+
+- **With Local Dataset Directory or Files** (offline / existing download):
+  ```bash
+  # Provide directory containing patient_vitals.csv and patients_meta.csv:
+  python scripts/sync_kaggle_cohort.py --input-csv /path/to/extracted_dataset/
+
+  # Or point directly to specific files:
+  python scripts/sync_kaggle_cohort.py --input-csv /path/to/patient_vitals.csv --input-meta-csv /path/to/patients_meta.csv
+  ```
+
+- **Without Credentials** (deterministic benchmark generator):
+  ```bash
+  # If credentials are not present, the script automatically falls back to
+  # the deterministic benchmark generator matching the Kaggle ground-truth rules
+  python scripts/sync_kaggle_cohort.py --synthetic-fallback
+  ```
+
+- **Verify Cohort Integrity**:
+  ```bash
+  python scripts/sync_kaggle_cohort.py --verify-only
+  ```
+
+---
+
+## Automated GitHub Actions Sync
+
+A scheduled GitHub Actions workflow is provided at [`.github/workflows/sync-kaggle-cohort.yml`](.github/workflows/sync-kaggle-cohort.yml):
+
+- **Triggers**:
+  - **Manual**: On-demand via the Actions tab (`workflow_dispatch`).
+  - **Scheduled**: Runs weekly every Sunday at 04:00 UTC (`cron: '0 4 * * 0'`).
+- **Secrets Configured**: `KAGGLE_USERNAME` and `KAGGLE_KEY` in repository settings.
+- **Safety**: Runs with read-only permissions by default, validates the generated cohort, and uploads `demo-cohort.json` as an inspection artifact. Includes an optional scoped pull-request step to review changes before merging.
+- **Resilience**: The client UI gracefully uses its committed static cohort if the sync has never run or if network access is unavailable.
+
+---
 
 ## Tech Stack
 
-- **Framework**: Next.js (App Router)
-- **UI & Styling**: React, Tailwind CSS, Lucide Icons
-- **Visualization**: Recharts
-- **Animation & Effects**: Three.js, React Three Fiber
+- **Framework**: Next.js (App Router, Static Export `output: 'export'`)
+- **Language**: TypeScript 5.9
+- **Styling**: Tailwind CSS 4.2
+- **Icons**: Lucide React
+- **Telemetry Charts**: Recharts
+- **ETL Scripting**: Python 3.11+ (standard library + optional `kagglehub` / `requests`)
+
+---
 
 ## Getting Started
 
@@ -36,20 +214,31 @@ npm install
 
 ### Development Server
 
-Start the local development server:
-
 ```bash
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-### Production Build
-
-Create an optimized static build:
+### Production Build & Type Checking
 
 ```bash
+# Verify TypeScript types
+npx tsc --noEmit
+
+# Compile static production export
 npm run build
 ```
 
-The output will be generated in the `out/` directory.
+The optimized static production build will be generated in the `out/` directory.
+
+---
+
+## Clinical Demo & Synthetic Data Disclaimer
+
+> [!WARNING]
+> **Academic & Prototyping Disclaimer**
+>
+> The data provided in this project, including records derived from Kaggle dataset `pallachetanareddy/icu-patient-vitals-monitoring-dataset`, consists entirely of **synthetic, simulated patient records** generated for machine learning algorithm prototyping, sensor fusion research, and user interface demonstration.
+>
+> This software is a proof-of-concept simulation environment and is **not** validated for actual clinical diagnosis, triage, treatment planning, or live patient monitoring. It must **not** be used in real-world clinical or emergency settings without thorough clinical trials, institutional review, and regulatory clearance.
